@@ -1,0 +1,192 @@
+{
+ "books": [
+  {
+   "id": "magi",
+   "title": "The Gift of the Magi",
+   "author": "O. Henry",
+   "reader": "Betsie Bush",
+   "level": "Лёгкий",
+   "about": "Короткий рождественский рассказ о молодой паре, у которой нет денег на подарки. Простой язык и знаменитая концовка: хорошее начало.",
+   "source": "https://archive.org/details/giftofmagi",
+   "cover": "library/magi/cover.jpg",
+   "parts": [
+    {
+     "name": "Рассказ",
+     "audio": "https://archive.org/download/giftofmagi/gift_of_the_magi_henry_blb_64kb.mp3",
+     "tr": "library/magi/01.json",
+     "size": 6420608,
+     "duration": 796.32
+    }
+   ]
+  },
+  {
+   "id": "wilde",
+   "title": "The Happy Prince and Other Tales",
+   "author": "Oscar Wilde",
+   "reader": "LibriVox",
+   "level": "Лёгкий",
+   "about": "Пять сказок Оскара Уайльда: «Счастливый принц», «Соловей и роза», «Великан-эгоист» и другие. Короткие истории, красивый и понятный язык.",
+   "source": "https://archive.org/details/thehappyprinceandothertales_1411_librivox",
+   "cover": "library/wilde/cover.jpg",
+   "parts": [
+    {
+     "name": "The Happy Prince",
+     "audio": "https://archive.org/download/thehappyprinceandothertales_1411_librivox/thehappyprinceandothertales_01_wilde_64kb.mp3",
+     "tr": "library/wilde/01.json",
+     "size": 11528192,
+     "duration": 1435.68
+    },
+    {
+     "name": "The Nightingale and the Rose",
+     "audio": "https://archive.org/download/thehappyprinceandothertales_1411_librivox/thehappyprinceandothertales_02_wilde_64kb.mp3",
+     "tr": "library/wilde/02.json",
+     "size": 7650304,
+     "duration": 956.0
+    },
+    {
+     "name": "The Selfish Giant",
+     "audio": "https://archive.org/download/thehappyprinceandothertales_1411_librivox/thehappyprinceandothertales_03_wilde_64kb.mp3",
+     "tr": "library/wilde/03.json",
+     "size": 5448192,
+     "duration": 675.76
+    },
+    {
+     "name": "The Devoted Friend",
+     "audio": "https://archive.org/download/thehappyprinceandothertales_1411_librivox/thehappyprinceandothertales_04_wilde_64kb.mp3",
+     "tr": "library/wilde/04.json",
+     "size": 13217792,
+     "duration": 1651.94
+    },
+    {
+     "name": "The Remarkable Rocket",
+     "audio": "https://archive.org/download/thehappyprinceandothertales_1411_librivox/thehappyprinceandothertales_05_wilde_64kb.mp3",
+     "tr": "library/wilde/05.json",
+     "size": 15623680,
+     "duration": 1942.04
+    }
+   ]
+  },
+  {
+   "id": "alice",
+   "title": "Alice's Adventures in Wonderland",
+   "author": "Lewis Carroll",
+   "reader": "Kara Shallenberg",
+   "level": "Средний",
+   "about": "«Алиса в Стране чудес» целиком, 12 глав. Игра слов и необычные обороты, зато главы короткие и сюжет известен заранее.",
+   "source": "https://archive.org/details/alices_adventures_1003",
+   "cover": "library/alice/cover.jpg",
+   "parts": [
+    {
+     "name": "Down the Rabbit Hole",
+     "audio": "https://archive.org/download/alices_adventures_1003/alices_adventures_01_carroll_64kb.mp3",
+     "tr": "library/alice/01.json",
+     "size": 6371811,
+     "duration": 790.84
+    },
+    {
+     "name": "The Pool of Tears",
+     "audio": "https://archive.org/download/alices_adventures_1003/alices_adventures_02_carroll_64kb.mp3",
+     "tr": "library/alice/02.json",
+     "size": 6202326,
+     "duration": 768.8
+    },
+    {
+     "name": "A Caucus-Race and a Long Tale",
+     "audio": "https://archive.org/download/alices_adventures_1003/alices_adventures_03_carroll_64kb.mp3",
+     "tr": "library/alice/03.json",
+     "size": 5061100,
+     "duration": 626.42
+    },
+    {
+     "name": "The Rabbit Sends in a Little Bill",
+     "audio": "https://archive.org/download/alices_adventures_1003/alices_adventures_04_carroll_64kb.mp3",
+     "tr": "library/alice/04.json",
+     "size": 7490701,
+     "duration": 929.82
+    },
+    {
+     "name": "Advice from a Caterpillar",
+     "audio": "https://archive.org/download/alices_adventures_1003/alices_adventures_05_carroll_64kb.mp3",
+     "tr": "library/alice/05.json",
+     "size": 6651222,
+     "duration": 825.04
+    },
+    {
+     "name": "Pig and Pepper",
+     "audio": "https://archive.org/download/alices_adventures_1003/alices_adventures_06_carroll_64kb.mp3",
+     "tr": "library/alice/06.json",
+     "size": 7897983,
+     "duration": 980.88
+    },
+    {
+     "name": "A Mad Tea-Party",
+     "audio": "https://archive.org/download/alices_adventures_1003/alices_adventures_07_carroll_64kb.mp3",
+     "tr": "library/alice/07.json",
+     "size": 7154853,
+     "duration": 888.74
+    },
+    {
+     "name": "The Queen's Croquet-Ground",
+     "audio": "https://archive.org/download/alices_adventures_1003/alices_adventures_08_carroll_64kb.mp3",
+     "tr": "library/alice/08.json",
+     "size": 7337721,
+     "duration": 911.3
+    },
+    {
+     "name": "The Mock Turtle's Story",
+     "audio": "https://archive.org/download/alices_adventures_1003/alices_adventures_09_carroll_64kb.mp3",
+     "tr": "library/alice/09.json",
+     "size": 7287145,
+     "duration": 905.06
+    },
+    {
+     "name": "The Lobster Quadrille",
+     "audio": "https://archive.org/download/alices_adventures_1003/alices_adventures_10_carroll_64kb.mp3",
+     "tr": "library/alice/10.json",
+     "size": 6646620,
+     "duration": 830.62
+    },
+    {
+     "name": "Who Stole the Tarts?",
+     "audio": "https://archive.org/download/alices_adventures_1003/alices_adventures_11_carroll_64kb.mp3",
+     "tr": "library/alice/11.json",
+     "size": 5863573,
+     "duration": 725.5
+    },
+    {
+     "name": "Alice's Evidence",
+     "audio": "https://archive.org/download/alices_adventures_1003/alices_adventures_12_carroll_64kb.mp3",
+     "tr": "library/alice/12.json",
+     "size": 6410469,
+     "duration": 795.76
+    }
+   ]
+  },
+  {
+   "id": "holmes",
+   "title": "A Scandal in Bohemia",
+   "author": "Arthur Conan Doyle",
+   "reader": "Ruth Golding",
+   "level": "Выше среднего",
+   "about": "Первый рассказ о Шерлоке Холмсе из сборника «Приключения Шерлока Холмса»: Ирен Адлер и король Богемии. Британское чтение, викторианский язык.",
+   "source": "https://archive.org/details/adventures_sherlock_holmes_rg_librivox",
+   "cover": "library/holmes/cover.jpg",
+   "parts": [
+    {
+     "name": "Часть 1",
+     "audio": "https://archive.org/download/adventures_sherlock_holmes_rg_librivox/adventuresholmes_01_doyle_64kb.mp3",
+     "tr": "library/holmes/01.json",
+     "size": 13366784,
+     "duration": 1665.38
+    },
+    {
+     "name": "Часть 2",
+     "audio": "https://archive.org/download/adventures_sherlock_holmes_rg_librivox/adventuresholmes_02_doyle_64kb.mp3",
+     "tr": "library/holmes/02.json",
+     "size": 18802176,
+     "duration": 2340.02
+    }
+   ]
+  }
+ ]
+}

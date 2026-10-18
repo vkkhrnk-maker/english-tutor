@@ -25,6 +25,8 @@
 
 `en-frequency.txt` — частотный список OpenSubtitles 2018 из [hermitdave/FrequencyWords](https://github.com/hermitdave/FrequencyWords) (CC BY-SA 4.0), по нему считается «понятно ≈X%».
 
-## Демо
+## Библиотека
 
-`https://vkkhrnk-maker.github.io/english-tutor/#demo` сразу загружает демо-книгу: «A Scandal in Bohemia» Артура Конан Дойла в исполнении Ruth Golding, запись [LibriVox](https://archive.org/details/adventures_sherlock_holmes_rg_librivox) (общественное достояние). Расшифровка с таймкодами слов сделана Whisper (`mlx-community/whisper-base.en-mlx`), файлы лежат в `demo/`.
+На полке есть раздел «Библиотека»: книги LibriVox (общественное достояние) — «The Gift of the Magi» (O. Henry), «The Happy Prince and Other Tales» (Oscar Wilde), «Alice's Adventures in Wonderland» (Lewis Carroll), «A Scandal in Bohemia» (Arthur Conan Doyle). Расшифровки с таймкодами слов сделаны Whisper (`mlx-community/whisper-base.en-mlx`) и лежат в `library/`, аудио приложение скачивает на телефон прямо с archive.org.
+
+Ссылка `#demo` сразу добавляет и открывает «A Scandal in Bohemia».

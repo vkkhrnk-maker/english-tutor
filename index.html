@@ -295,6 +295,23 @@ input[type=range]:active::-webkit-slider-thumb{transform:scale(1.25)}
 .tabs button[aria-selected="true"]{background:var(--bg);color:var(--fg);box-shadow:0 1px 3px rgba(0,0,0,.12)}
 .tabs .cnt{font-size:12px;min-width:20px;height:20px;padding:0 6px;border-radius:10px;background:var(--surface-2);display:inline-grid;place-items:center}
 .tabs .cnt.due{background:var(--accent);color:var(--accent-fg)}
+.intro{display:grid;gap:4px;margin-top:16px;padding:16px;border-radius:var(--r-l);background:var(--accent-soft)}
+.intro b{font-size:17px}
+.intro span{font-size:14px;color:var(--fg-2)}
+.lib-row{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:20px 14px}
+.lib-card{display:grid;gap:4px;text-align:left;align-content:start;min-width:0}
+.lib-card img{width:100%;aspect-ratio:1;object-fit:cover;border-radius:var(--r-m);margin-bottom:6px}
+.lib-card b{font-size:14px;line-height:1.25;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.lib-card small{font-size:12px;color:var(--fg-2)}
+.lib-meta{font-size:11px;font-weight:600;color:var(--accent)}
+@media (max-width:520px){.lib-row{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.own-book{display:flex;align-items:center;gap:14px;width:100%;text-align:left;margin-top:24px;padding:14px 16px;border-radius:var(--r-l);border:1.5px dashed var(--fg-3);color:var(--fg)}
+.own-book svg{flex:none;color:var(--accent)}
+.own-book span{display:grid;gap:2px}
+.own-book small{font-size:12px;color:var(--fg-2)}
+.lib-head{display:flex;gap:14px;align-items:center;margin-bottom:6px}
+.lib-head img{width:88px;height:88px;border-radius:var(--r-s);flex:none;object-fit:cover}
+.lib-head h3{margin:2px 0 6px}
 .demo-note{font-size:12px!important;color:var(--fg-3)!important;margin-top:4px!important}
 .goal{display:flex;align-items:center;gap:14px;width:100%;text-align:left;background:var(--surface);border-radius:var(--r-l);padding:14px 16px;margin-top:16px}
 .g-ring{width:52px;height:52px;border-radius:50%;flex:none;display:grid;place-items:center;background:conic-gradient(var(--accent) var(--p),var(--surface-2) 0)}
@@ -309,8 +326,9 @@ input[type=range]:active::-webkit-slider-thumb{transform:scale(1.25)}
 .wk span{font-size:12px;font-weight:600}
 .wk small{font-size:11px;color:var(--fg-3)}
 .book .meta2{font-size:12px;color:var(--fg-3)}
-header.top .add-ic{order:2;width:40px;height:40px}
-header.top .seg{order:3}
+header.top .add-ic{order:3;width:40px;height:40px}
+header.top .seg{order:2}
+header.top .seg button{padding:0 9px}
 header.top .brand{order:1}
 header.top .tabs{order:4}
 .pv-hint{display:block;width:100%;text-align:left;margin-top:12px;padding:10px 12px;border-radius:var(--r-s);background:var(--accent-soft);color:var(--fg);font-size:14px}
@@ -782,38 +800,80 @@ async function importFiles(files, folderName) {
     toast('Не получилось добавить: на телефоне могло закончиться место', 4000);
   } finally { importing = false; hideImport(); render(); }
 }
-// demo: a public-domain LibriVox recording with its Whisper transcript, shipped with the app
-const DEMO = { title: 'A Scandal in Bohemia', author: 'Arthur Conan Doyle · читает Ruth Golding (LibriVox)', files: ['adventuresholmes_01_doyle_64kb', 'adventuresholmes_02_doyle_64kb'], parts: ['Часть 1', 'Часть 2'] };
+// library: public-domain LibriVox books. Transcripts ship with the app, audio comes straight from archive.org
+let catalog = [];
+async function loadCatalog() { try { catalog = (await (await fetch('library/library.json')).json()).books || []; } catch { catalog = []; } }
 async function fetchBlob(url, onBytes) {
   const r = await fetch(url); if (!r.ok) throw new Error(url);
   if (!r.body || !onBytes) return r.blob();
   const reader = r.body.getReader(), chunks = []; let n = 0;
   for (;;) { const { done, value } = await reader.read(); if (done) break; chunks.push(value); n += value.length; onBytes(value.length); }
-  return new Blob(chunks, { type: r.headers.get('content-type') || '' });
+  return new Blob(chunks, { type: r.headers.get('content-type') || 'audio/mpeg' });
 }
-async function loadDemo() {
-  const have = books.find(b => b.demo);
+const libSize = c => c.parts.reduce((s, p) => s + (p.size || 0), 0);
+const libDur = c => c.parts.reduce((s, p) => s + (p.duration || 0), 0);
+function libSheet(c) {
+  const have = books.find(b => b.libId === c.id);
+  openSheet(`<div class="lib-head"><img src="${c.cover}" alt=""><div><div class="lk-meta">${esc(c.author)}</div><h3>${esc(c.title)}</h3><span class="pill acc">${esc(c.level)}</span></div></div>
+    <p>${esc(c.about)}</p>
+    <p class="num" style="font-size:13px">${c.parts.length > 1 ? `${c.parts.length} ${plural(c.parts.length, 'часть', 'части', 'частей')} · ` : ''}${human(libDur(c))} · читает ${esc(c.reader === 'LibriVox' ? 'команда LibriVox' : c.reader)}. Запись <a href="${c.source}" target="_blank" rel="noopener">LibriVox</a>, общественное достояние.</p>
+    <div class="acts">${have ? '<button class="btn primary" data-a="open">Открыть</button>' : `<button class="btn primary" data-a="add">Скачать на телефон · ${mbs(libSize(c))} МБ</button>`}</div>`, el => {
+    el.querySelector('[data-a=open]')?.addEventListener('click', () => { closeSheet(); openBook(have); });
+    el.querySelector('[data-a=add]')?.addEventListener('click', () => { closeSheet(); addFromLibrary(c); });
+  });
+}
+async function addFromLibrary(c) {
+  const have = books.find(b => b.libId === c.id);
   if (have) return openBook(have);
-  if (importing) return;
-  const total = 13366784 + 18802176; let got = 0;
-  showImport('Загружаю демо-книгу', 0, DEMO.files.length, 0, total);
+  if (importing) { toast('Подождите, добавляю другую книгу'); return; }
+  importing = true;
+  const id = 'b' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+  const total = libSize(c); let got = 0;
+  const book = { id, libId: c.id, title: c.title, author: `${c.author} · читает ${c.reader === 'LibriVox' ? 'LibriVox' : c.reader}`, cover: null, parts: [], pos: { part: 0, t: 0 }, speed: 1, added: Date.now(), last: 0, importing: true };
+  showImport(c.title, 0, c.parts.length, 0, total);
   try {
-    const files = [];
-    for (const [k, n] of DEMO.files.entries()) {
-      const mp3 = await fetchBlob(`demo/${n}.mp3`, d => { got += d; showImport('Загружаю демо-книгу', k, DEMO.files.length, got, total); });
-      const json = await fetchBlob(`demo/${n}.json`);
-      files.push(new File([mp3], `${n}.mp3`, { type: 'audio/mpeg' }), new File([json], `${n}.json`, { type: 'application/json' }));
+    book.cover = await fetchBlob(c.cover).catch(() => null);
+    for (const [i, p] of c.parts.entries()) {
+      const key = `${id}:${i}`;
+      const audioBlob = await fetchBlob(p.audio, d => { got += d; showImport(c.title, i, c.parts.length, got, total); });
+      await putFile(key, audioBlob);
+      const tr = await (await fetch(p.tr)).json();
+      await putFile(key + ':tr', tr);
+      book.parts.push({ name: p.name, key, tr: key + ':tr', duration: p.duration || tr.d, words: tr.s.reduce((n, sg) => n + sg[2].length, 0) });
+      if (i === 0 || (i + 1) % 4 === 0) { await putBook(book); if (!books.includes(book)) books.push(book); }
     }
-    const cover = await fetchBlob('demo/cover.jpg').catch(() => null);
-    hideImport();
-    const b = await importFiles(files, DEMO.title);
-    if (!b) return;
-    Object.assign(b, { title: DEMO.title, author: DEMO.author, demo: true });
-    b.parts.forEach((p, i) => { p.name = DEMO.parts[i] || p.name; });
-    if (cover) b.cover = cover;
-    await putBook(b); render(); openBook(b);
-  } catch { hideImport(); toast('Не получилось загрузить демо-книгу. Проверьте интернет', 4000); }
+    delete book.importing;
+    await putBook(book); if (!books.includes(book)) books.push(book);
+    hideImport(); importing = false; render(); openBook(book);
+  } catch {
+    hideImport(); importing = false;
+    if (book.parts.length) { delete book.importing; await putBook(book); if (!books.includes(book)) books.push(book); toast(`Скачано ${book.parts.length} из ${c.parts.length} частей: пропала связь. Откройте книгу ещё раз, чтобы докачать`, 5000); }
+    else toast('Не получилось скачать книгу. Проверьте интернет', 4000);
+    render();
+  }
 }
+async function resumeLibrary(b, c) {
+  importing = true;
+  const left = c.parts.slice(b.parts.length), total = left.reduce((s, p) => s + p.size, 0); let got = 0;
+  showImport(c.title, 0, left.length, 0, total);
+  try {
+    for (const [k, p] of left.entries()) {
+      const i = b.parts.length, key = `${b.id}:${i}`;
+      await putFile(key, await fetchBlob(p.audio, d => { got += d; showImport(c.title, k, left.length, got, total); }));
+      const tr = await (await fetch(p.tr)).json(); await putFile(key + ':tr', tr);
+      b.parts.push({ name: p.name, key, tr: key + ':tr', duration: p.duration || tr.d, words: 0 }); await putBook(b);
+    }
+  } catch { toast('Не всё докачалось: проверьте интернет', 4000); }
+  hideImport(); importing = false; render(); openBook(b);
+}
+function libraryHTML() {
+  if (!catalog.length) return '';
+  return `<div class="section-h"><h2>Библиотека</h2><span>бесплатно · LibriVox</span></div><div class="lib-row">` + catalog.map(c => {
+    const have = books.some(b => b.libId === c.id);
+    return `<button class="lib-card" data-lib="${c.id}"><img src="${c.cover}" alt="" loading="lazy"><b>${esc(c.title)}</b><small>${esc(c.author)}</small><span class="lib-meta num">${esc(c.level)} · ${human(libDur(c))}${have ? ' · на телефоне' : ''}</span></button>`;
+  }).join('') + `</div>`;
+}
+
 // added later to an existing book: transcripts only
 async function attachTranscripts(b, files) {
   const map = new Map(files.filter(f => /\.json$/i.test(f.name)).map(f => [baseKey(f.name), f]));
@@ -832,8 +892,7 @@ $('#f-dir').onchange = e => { const fs = [...e.target.files]; e.target.value = '
 let pendingAttach = null;
 $('#add-btn').onclick = () => openSheet(`<h3>Добавить книгу</h3>
   <p>Выберите сразу все MP3-части книги и файлы расшифровки .json. Расшифровка подхватится к части с тем же именем.</p>
-  <div class="opts"><button class="opt" data-a="files">Выбрать файлы <span>›</span></button><button class="opt" data-a="dir">Выбрать папку (на компьютере) <span>›</span></button><button class="opt" data-a="demo"><span>Демо-книга<small>«A Scandal in Bohemia», LibriVox, 32 МБ</small></span><span>›</span></button></div>`, el => {
-  el.querySelector('[data-a=demo]').onclick = () => { closeSheet(); loadDemo(); };
+  <div class="opts"><button class="opt" data-a="files">Выбрать файлы <span>›</span></button><button class="opt" data-a="dir">Выбрать папку (на компьютере) <span>›</span></button></div>`, el => {
   el.querySelector('[data-a=files]').onclick = () => { closeSheet(); $('#f-files').click(); };
   el.querySelector('[data-a=dir]').onclick = () => { closeSheet(); $('#f-dir').click(); };
 });
@@ -863,30 +922,30 @@ function render() {
   if (iOS && !navigator.standalone && !matchMedia('(display-mode: standalone)').matches)
     warn += '<div class="warn"><b>Сначала установите приложение.</b> В Safari: ☰ → «Поделиться» → «На экран „Домой"», дальше открывайте с иконки. У Safari и приложения разные полки.</div>';
   if (!books.length) {
-    m.innerHTML = `${warn}<div class="empty"><div class="ic">${I.book}</div><h2>Добавьте первую книгу</h2>
-      <p>Нужны MP3-части аудиокниги и файлы расшифровки .json с теми же именами: из них берётся текст с таймкодом каждого слова. Всё хранится только на этом устройстве.</p>
-      <div class="acts"><button class="btn primary" id="e-demo">Открыть демо-книгу</button><button class="btn ghost" id="e-add">Выбрать свои файлы</button></div>
-      <p class="demo-note">Демо: «A Scandal in Bohemia» Конан Дойла, запись LibriVox, общественное достояние, 32 МБ.</p>
-      <ul><li>Караоке-подсветка</li><li>Перевод по тапу</li><li>Словарь и карточки</li><li>Режим «тень»</li><li>Диктант</li></ul></div>`;
-    $('#e-add').onclick = () => $('#f-files').click();
-    $('#e-demo').onclick = loadDemo;
+    m.innerHTML = `${warn}<div class="intro"><b>Английский на слух по аудиокнигам</b><span>Текст подсвечивается за голосом, тап по слову или фразе даёт перевод, слова уходят в карточки. Начните с книги из библиотеки или добавьте свою.</span></div>` +
+      libraryHTML() + `<button class="own-book" id="e-add">${I.plus}<span><b>Своя книга</b><small>MP3-части и файлы расшифровки .json с теми же именами</small></span></button>`;
+    $('#e-add').onclick = () => $('#add-btn').click();
+    $$('[data-lib]').forEach(el => el.onclick = () => libSheet(catalog.find(c => c.id === el.dataset.lib)));
     return;
   }
   const sorted = [...books].sort((a, b) => (b.last || b.added) - (a.last || a.added));
-  m.innerHTML = warn + goalCardHTML() + `<div class="section-h"><h2>Книги</h2><span class="num">${books.length} ${plural(books.length, 'книга', 'книги', 'книг')}</span></div><div class="grid">` +
+  m.innerHTML = warn + goalCardHTML() + `<div class="section-h"><h2>Мои книги</h2><span class="num">${books.length} ${plural(books.length, 'книга', 'книги', 'книг')}</span></div><div class="grid">` +
     sorted.map(b => {
       const p = bookTotal(b) ? bookDone(b) / bookTotal(b) : 0, trN = b.parts.filter(x => x.tr).length;
       return `<button class="book" data-open="${b.id}"><div class="cov">${coverHTML(b)}</div>
         ${p > 0 ? `<div class="pbar"><i style="width:${(p * 100).toFixed(1)}%"></i></div>` : ''}
         <div><b>${esc(b.title)}</b><small class="num">${b.parts.length} ${plural(b.parts.length, 'часть', 'части', 'частей')} · ${human(bookTotal(b))}</small>
         ${trN < b.parts.length ? `<small class="meta2">Без текста: ${b.parts.length - trN} из ${b.parts.length}</small>` : ''}</div></button>`;
-    }).join('') + `</div>`;
+    }).join('') + `</div>` + libraryHTML();
   $$('[data-open]').forEach(el => el.onclick = () => openBook(books.find(x => x.id === el.dataset.open)));
+  $$('[data-lib]').forEach(el => el.onclick = () => libSheet(catalog.find(c => c.id === el.dataset.lib)));
   $('#goal')?.addEventListener('click', goalSheet);
 }
 
 /* ---------- playback ---------- */
 async function openBook(b) {
+  const c = b.libId && catalog.find(x => x.id === b.libId);
+  if (c && b.parts.length < c.parts.length && !importing) return resumeLibrary(b, c);
   if (cur?.id !== b.id || !audio.src) { if (cur && cur.id !== b.id) await save(); cur = b; await loadPart(b.pos.part, b.pos.t, false); }
   openReader();
 }
@@ -1789,7 +1848,8 @@ addEventListener('keydown', e => {
   await loadFrequency();
   const last = [...books].filter(b => b.last).sort((a, b) => b.last - a.last)[0];
   if (last) { cur = last; renderMini(); }
-  if (location.hash === '#demo') { history.replaceState(null, '', location.pathname); loadDemo(); }
+  await loadCatalog(); render();
+  if (location.hash === '#demo' || location.hash === '#holmes') { history.replaceState(null, '', location.pathname); const c = catalog.find(x => x.id === 'holmes'); if (c) addFromLibrary(c); }
 })();
 })();
 </script>

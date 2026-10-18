@@ -1,5 +1,5 @@
 // Офлайн-кэш оболочки приложения. Сами книги лежат в IndexedDB и через этот файл не проходят.
-const VERSION = '252a343f7c';
+const VERSION = 'f943d8431d';
 const CACHE = `entutor-${VERSION}`;
 const SHELL = ['./', 'index.html', 'manifest.webmanifest', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/apple-touch-icon.png', 'en-frequency.txt'];
 
@@ -32,7 +32,7 @@ self.addEventListener('fetch', e => {
 
   // свои файлы и шрифты Google: из кэша, в фоне обновляем
   const isFont = url.hostname === 'fonts.googleapis.com' || url.hostname === 'fonts.gstatic.com';
-  if (url.pathname.includes('/demo/')) return;   // the demo book goes to IndexedDB, no need to keep a second copy
+  if (url.origin !== location.origin && !isFont) return;   // archive.org audio goes straight to IndexedDB
   if (url.origin === location.origin || isFont) {
     e.respondWith(
       caches.match(req).then(hit => {

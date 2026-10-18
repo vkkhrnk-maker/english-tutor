@@ -277,6 +277,7 @@ input[type=range]:active::-webkit-slider-thumb{transform:scale(1.25)}
 .tabs button[aria-selected="true"]{background:var(--bg);color:var(--fg);box-shadow:0 1px 3px rgba(0,0,0,.12)}
 .tabs .cnt{font-size:12px;min-width:20px;height:20px;padding:0 6px;border-radius:10px;background:var(--surface-2);display:inline-grid;place-items:center}
 .tabs .cnt.due{background:var(--accent);color:var(--accent-fg)}
+.demo-note{font-size:12px!important;color:var(--fg-3)!important;margin-top:4px!important}
 .goal{display:flex;align-items:center;gap:14px;width:100%;text-align:left;background:var(--surface);border-radius:var(--r-l);padding:14px 16px;margin-top:16px}
 .g-ring{width:52px;height:52px;border-radius:50%;flex:none;display:grid;place-items:center;background:conic-gradient(var(--accent) var(--p),var(--surface-2) 0)}
 .g-ring span{width:40px;height:40px;border-radius:50%;background:var(--surface);display:grid;place-items:center;font-size:12px;font-weight:700;color:var(--accent)}
@@ -408,8 +409,8 @@ button.pill{cursor:pointer}
 .dict-res .s{font-family:var(--read-font);font-size:17px;line-height:1.6}
 .dict-ok{color:var(--accent);font-weight:600}
 .dict-miss{text-decoration:line-through;text-decoration-color:var(--danger);color:var(--fg-2)}
-.row{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
-.row .btn{height:38px;padding:0 14px;font-size:13px}
+.drow{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+.drow .btn{height:38px;padding:0 14px;font-size:13px}
 .toggle{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:14px 16px;border-radius:var(--r-s);background:var(--surface);font-weight:500;width:100%;text-align:left}
 .toggle i{width:44px;height:26px;border-radius:13px;background:var(--surface-2);position:relative;flex:none;transition:background .15s}
 .toggle i::after{content:"";position:absolute;top:3px;left:3px;width:20px;height:20px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.25);transition:transform .15s}
@@ -757,9 +758,42 @@ async function importFiles(files, folderName) {
     if (!books.includes(book)) books.push(book);
     const withTr = book.parts.filter(p => p.tr).length;
     toast(withTr ? `Книга добавлена: ${withTr} из ${book.parts.length} частей с текстом` : 'Книга добавлена, но без расшифровок: положите рядом .json с теми же именами', 4000);
+    return book;
   } catch (e) {
     toast('Не получилось добавить: на телефоне могло закончиться место', 4000);
   } finally { importing = false; hideImport(); render(); }
+}
+// demo: a public-domain LibriVox recording with its Whisper transcript, shipped with the app
+const DEMO = { title: 'A Scandal in Bohemia', author: 'Arthur Conan Doyle · читает Ruth Golding (LibriVox)', files: ['adventuresholmes_01_doyle_64kb', 'adventuresholmes_02_doyle_64kb'], parts: ['Часть 1', 'Часть 2'] };
+async function fetchBlob(url, onBytes) {
+  const r = await fetch(url); if (!r.ok) throw new Error(url);
+  if (!r.body || !onBytes) return r.blob();
+  const reader = r.body.getReader(), chunks = []; let n = 0;
+  for (;;) { const { done, value } = await reader.read(); if (done) break; chunks.push(value); n += value.length; onBytes(value.length); }
+  return new Blob(chunks, { type: r.headers.get('content-type') || '' });
+}
+async function loadDemo() {
+  const have = books.find(b => b.demo);
+  if (have) return openBook(have);
+  if (importing) return;
+  const total = 13366784 + 18802176; let got = 0;
+  showImport('Загружаю демо-книгу', 0, DEMO.files.length, 0, total);
+  try {
+    const files = [];
+    for (const [k, n] of DEMO.files.entries()) {
+      const mp3 = await fetchBlob(`demo/${n}.mp3`, d => { got += d; showImport('Загружаю демо-книгу', k, DEMO.files.length, got, total); });
+      const json = await fetchBlob(`demo/${n}.json`);
+      files.push(new File([mp3], `${n}.mp3`, { type: 'audio/mpeg' }), new File([json], `${n}.json`, { type: 'application/json' }));
+    }
+    const cover = await fetchBlob('demo/cover.jpg').catch(() => null);
+    hideImport();
+    const b = await importFiles(files, DEMO.title);
+    if (!b) return;
+    Object.assign(b, { title: DEMO.title, author: DEMO.author, demo: true });
+    b.parts.forEach((p, i) => { p.name = DEMO.parts[i] || p.name; });
+    if (cover) b.cover = cover;
+    await putBook(b); render(); openBook(b);
+  } catch { hideImport(); toast('Не получилось загрузить демо-книгу. Проверьте интернет', 4000); }
 }
 // added later to an existing book: transcripts only
 async function attachTranscripts(b, files) {
@@ -779,7 +813,8 @@ $('#f-dir').onchange = e => { const fs = [...e.target.files]; e.target.value = '
 let pendingAttach = null;
 $('#add-btn').onclick = () => openSheet(`<h3>Добавить книгу</h3>
   <p>Выберите сразу все MP3-части книги и файлы расшифровки .json. Расшифровка подхватится к части с тем же именем.</p>
-  <div class="opts"><button class="opt" data-a="files">Выбрать файлы <span>›</span></button><button class="opt" data-a="dir">Выбрать папку (на компьютере) <span>›</span></button></div>`, el => {
+  <div class="opts"><button class="opt" data-a="files">Выбрать файлы <span>›</span></button><button class="opt" data-a="dir">Выбрать папку (на компьютере) <span>›</span></button><button class="opt" data-a="demo"><span>Демо-книга<small>«A Scandal in Bohemia», LibriVox, 32 МБ</small></span><span>›</span></button></div>`, el => {
+  el.querySelector('[data-a=demo]').onclick = () => { closeSheet(); loadDemo(); };
   el.querySelector('[data-a=files]').onclick = () => { closeSheet(); $('#f-files').click(); };
   el.querySelector('[data-a=dir]').onclick = () => { closeSheet(); $('#f-dir').click(); };
 });
@@ -811,9 +846,11 @@ function render() {
   if (!books.length) {
     m.innerHTML = `${warn}<div class="empty"><div class="ic">${I.book}</div><h2>Добавьте первую книгу</h2>
       <p>Нужны MP3-части аудиокниги и файлы расшифровки .json с теми же именами: из них берётся текст с таймкодом каждого слова. Всё хранится только на этом устройстве.</p>
-      <div class="acts"><button class="btn primary" id="e-add">Выбрать файлы</button></div>
+      <div class="acts"><button class="btn primary" id="e-demo">Открыть демо-книгу</button><button class="btn ghost" id="e-add">Выбрать свои файлы</button></div>
+      <p class="demo-note">Демо: «A Scandal in Bohemia» Конан Дойла, запись LibriVox, общественное достояние, 32 МБ.</p>
       <ul><li>Караоке-подсветка</li><li>Перевод по тапу</li><li>Словарь и карточки</li><li>Режим «тень»</li><li>Диктант</li></ul></div>`;
     $('#e-add').onclick = () => $('#f-files').click();
+    $('#e-demo').onclick = loadDemo;
     return;
   }
   const sorted = [...books].sort((a, b) => (b.last || b.added) - (a.last || a.added));
@@ -1609,9 +1646,9 @@ function dictationSheet() {
     setTimeout(() => playRange(tr.segs[si].s, tr.segs[si].e), 250);
   };
   openSheet(`<h3>Диктант</h3><p class="num" id="d-prog"></p>
-    <div class="row" style="margin-top:0"><button class="btn primary" id="d-play">Прослушать</button><button class="btn ghost" id="d-slow">Медленно</button></div>
+    <div class="drow" style="margin-top:0"><button class="btn primary" id="d-play">Прослушать</button><button class="btn ghost" id="d-slow">Медленно</button></div>
     <div class="field"><label for="d-in">Запишите, что услышали</label><textarea class="dict-in" id="d-in" autocapitalize="off" autocomplete="off" spellcheck="false"></textarea></div>
-    <div class="row"><button class="btn primary" id="d-check">Проверить</button><button class="btn ghost" id="d-show">Показать текст</button><button class="btn ghost" id="d-next">Следующая фраза</button></div>
+    <div class="drow"><button class="btn primary" id="d-check">Проверить</button><button class="btn ghost" id="d-show">Показать текст</button><button class="btn ghost" id="d-next">Следующая фраза</button></div>
     <div class="dict-res" id="d-res" hidden></div>`, el => {
     el.querySelector('#d-play').onclick = () => playRange(tr.segs[si].s, tr.segs[si].e);
     el.querySelector('#d-slow').onclick = () => playRange(tr.segs[si].s, tr.segs[si].e, 0.7);
@@ -1733,6 +1770,7 @@ addEventListener('keydown', e => {
   await loadFrequency();
   const last = [...books].filter(b => b.last).sort((a, b) => b.last - a.last)[0];
   if (last) { cur = last; renderMini(); }
+  if (location.hash === '#demo') { history.replaceState(null, '', location.pathname); loadDemo(); }
 })();
 })();
 </script>

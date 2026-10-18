@@ -24,3 +24,7 @@
 3. Закоммитить и запушить.
 
 `en-frequency.txt` — частотный список OpenSubtitles 2018 из [hermitdave/FrequencyWords](https://github.com/hermitdave/FrequencyWords) (CC BY-SA 4.0), по нему считается «понятно ≈X%».
+
+## Демо
+
+`https://vkkhrnk-maker.github.io/english-tutor/#demo` сразу загружает демо-книгу: «A Scandal in Bohemia» Артура Конан Дойла в исполнении Ruth Golding, запись [LibriVox](https://archive.org/details/adventures_sherlock_holmes_rg_librivox) (общественное достояние). Расшифровка с таймкодами слов сделана Whisper (`mlx-community/whisper-base.en-mlx`), файлы лежат в `demo/`.

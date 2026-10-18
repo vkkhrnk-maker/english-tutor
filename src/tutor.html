@@ -286,7 +286,15 @@ input[type=range]:active::-webkit-slider-thumb{transform:scale(1.25)}
 .rd-title{flex:1;min-width:0;text-align:center}
 .rd-title b{display:block;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .rd-title small{display:block;font-size:12px;color:var(--fg-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.rd-comp{display:flex;justify-content:center;gap:8px;flex-wrap:wrap;padding-bottom:8px;flex:none}
+.rd-comp{display:flex;justify-content:center;align-items:center;gap:8px;flex-wrap:wrap;padding:0 16px 8px;flex:none}
+.rd-pills{display:flex;gap:6px;flex-wrap:wrap;justify-content:center}
+button.pill{cursor:pointer}
+.mode-seg button{height:28px;padding:0 12px;font-size:12px;font-weight:600}
+.tx.reading .w.read{color:inherit}
+.tx.reading .w.active{background:none;color:inherit;text-decoration:inherit}
+.readbar{display:flex!important;justify-content:center;padding-top:10px}
+.readbar[hidden]{display:none!important}
+.readbar .btn{height:44px;padding:0 22px}
 .pill{font-size:12px;font-weight:600;padding:4px 10px;border-radius:999px;background:var(--surface);color:var(--fg-2)}
 .pill.acc{background:var(--accent-soft);color:var(--accent)}
 .tx{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:none;position:relative}
@@ -296,7 +304,7 @@ input[type=range]:active::-webkit-slider-thumb{transform:scale(1.25)}
 .sg.ch{font-family:var(--font);font-weight:700;font-size:15px;letter-spacing:.06em;text-transform:uppercase;color:var(--accent);margin-top:1.4em}
 .w{border-radius:4px;padding:0 1px;margin:0 -1px;cursor:pointer;transition:background .12s,color .12s;-webkit-tap-highlight-color:transparent}
 .w.read{color:var(--fg-2)}
-.w.new{text-decoration:underline dotted var(--accent);text-underline-offset:4px;text-decoration-thickness:2px}
+.w.new{text-decoration:underline dotted color-mix(in srgb,var(--accent) 70%,transparent);text-underline-offset:5px;text-decoration-thickness:1.5px}
 .w.learning{background:var(--accent-soft)}
 .w.active{background:var(--accent);color:var(--accent-fg);text-decoration:none}
 .w.sel{outline:2px solid var(--accent);outline-offset:1px}
@@ -414,7 +422,7 @@ const audio = $('#audio');
 const AUDIO_RE = /\.(mp3|m4a|m4b|aac|ogg|oga|opus|flac|wav)$/i;
 const SPEEDS = [0.6, 0.75, 0.85, 1, 1.15, 1.25, 1.5, 2];
 const INTERVALS = [8 * 60e3, 864e5, 3 * 864e5, 7 * 864e5, 16 * 864e5, 35 * 864e5];
-const KNOWN_TOP = 5000;
+const LEVELS = { more: 5000, less: 12000, off: 0 };   // how many top-frequency words count as known
 
 const I = {
   play:'<svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.5v13a1 1 0 0 0 1.5.86l10.6-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z"/></svg>',
@@ -464,9 +472,9 @@ const lsSet = (k, v) => { try { localStorage.setItem(k, v); } catch {} };
 
 /* ---------- state ---------- */
 let books = [], cur = null, curUrl = null, viewing = null;
-let vocab = [], known = new Set(), common = new Set(), lookCache = {};
+let vocab = [], known = new Set(), freqRank = new Map(), lookCache = {};
 let tr = null;               // current part transcript: { segs: [{s,e,t,wi0,wi1,ch}], words: [{w,s,e,seg,el}] }
-let activeW = -1, activeSeg = -1, follow = true, shadow = lsGet('et-shadow') === '1', colorize = lsGet('et-color') !== '0';
+let activeW = -1, activeSeg = -1, follow = true, shadow = lsGet('et-shadow') === '1', level = LEVELS[lsGet('et-level')] !== undefined ? lsGet('et-level') : 'less';
 let shadowPaused = -1, stopAt = null, curTab = 'books';
 const coverUrls = new Map();
 
@@ -618,13 +626,14 @@ async function loadFrequency() {
   try {
     const txt = await (await fetch('en-frequency.txt')).text();
     const words = txt.split('\n').map(x => x.trim().toLowerCase()).filter(x => x && !x.startsWith('#'));
-    common = new Set(words.slice(0, KNOWN_TOP));
-  } catch { common = new Set(); }
+    freqRank = new Map(words.map((w, i) => [w, i]));
+  } catch { freqRank = new Map(); }
 }
 function wordStatus(tok) {
   if (!tok) return 'known';
   const stem = tok.replace(/'s$/, '');
-  const isKnown = t => known.has(t) || common.has(t);
+  const top = LEVELS[level] || LEVELS.less;
+  const isKnown = t => known.has(t) || (freqRank.get(t) ?? Infinity) < top;
   if (isKnown(tok) || isKnown(stem)) return 'known';
   if (vocabSet.has(tok) || vocabSet.has(stem)) return 'learning';
   return 'new';
@@ -871,7 +880,12 @@ function buildTranscript(c) {
   const chRe = /^\s*chapter\b/i;
   c.s.forEach((sg, si) => {
     const wi0 = words.length;
-    for (const [w, s, e] of sg[2]) words.push({ w, s, e, seg: si, el: null });
+    for (const [w, s, e] of sg[2]) {
+      // a capitalised word mid-sentence is a name (Vernon, Hogwarts): not underlined, not counted
+      const prev = words[words.length - 1]?.w || '';
+      const start = !prev || /[.!?…"”»:]$/.test(prev);
+      words.push({ w, s, e, seg: si, el: null, name: !start && /^[A-Z]/.test(w.replace(/^[^A-Za-z]+/, '')) && w !== 'I' && !/^I'/.test(w) });
+    }
     const t = sg[2].map(x => x[0]).join(' ');
     segs.push({ s: sg[0], e: sg[1], t, wi0, wi1: words.length, ch: chRe.test(t) });
   });
@@ -888,10 +902,10 @@ function openReader() {
   R.innerHTML = `<div class="wrap rd-top"><button class="ibtn" id="r-close" aria-label="Свернуть">${I.down}</button>
       <div class="rd-title"><b id="r-book"></b><small id="r-part"></small></div>
       <button class="ibtn" id="r-nav" aria-label="Части, главы и поиск">${I.list}</button><button class="ibtn" id="r-more" aria-label="Ещё">${I.more}</button></div>
-    <div class="rd-comp" id="r-comp"></div>
+    <div class="rd-comp" id="r-comp"><div class="seg mode-seg" role="group" aria-label="Режим"><button data-mode="listen">Слушать</button><button data-mode="read">Читать</button></div><span class="rd-pills" id="r-pills"></span></div>
     <div class="tx" id="tx"><div class="tx-in" id="tx-in"></div></div>
     <div class="follow-wrap"><button class="btn ghost" id="r-follow" hidden>К текущему месту</button></div>
-    <div class="rd-bottom"><div class="wrap">
+    <div class="rd-bottom"><div class="wrap readbar" id="r-readbar" hidden><button class="btn primary" id="r-listen-here">Слушать с этого места</button></div><div class="wrap" id="r-player">
       <div class="shadowbar" id="r-shadow" hidden>Повторите фразу вслух <button class="btn ghost" id="sh-again">Ещё раз</button><button class="btn primary" id="sh-next">Дальше</button></div>
       <div><input type="range" id="r-seek" min="0" max="1000" value="0" aria-label="Позиция"><div class="times num"><span id="r-el">0:00</span><span id="r-rem">-0:00</span></div></div>
       <div class="rd-ctrls">
@@ -916,6 +930,14 @@ function openReader() {
   $('#sh-again').onclick = () => { shadowPaused = -1; replaySentence(); };
   $('#sh-next').onclick = () => { showShadowBar(false); audio.play().catch(() => {}); };
   $('#r-nav').onclick = navSheet;
+  $$('.mode-seg [data-mode]').forEach(b => b.onclick = () => setMode(b.dataset.mode));
+  $('#r-listen-here').onclick = () => { const si = firstVisibleSeg(); setMode('listen'); if (tr && si >= 0) { audio.currentTime = tr.segs[si].s + 0.01; } follow = true; audio.play().catch(() => {}); };
+  let readT;
+  $('#tx').addEventListener('scroll', () => {
+    if (cur?.mode !== 'read' || !tr) return;
+    clearTimeout(readT);
+    readT = setTimeout(() => { const si = firstVisibleSeg(); if (si >= 0) { cur.pos.t = tr.segs[si].s; if (!audio.paused) return; if (audio.src) audio.currentTime = cur.pos.t; save(); renderMini(); } }, 400);
+  }, { passive: true });
   $('#r-more').onclick = moreSheet;
   $('#r-follow').onclick = () => { follow = true; $('#r-follow').hidden = true; scrollToActive(true); };
   const seek = $('#r-seek');
@@ -930,11 +952,29 @@ function openReader() {
     dbl = setTimeout(() => { dbl = null; }, 280);
     lookupWord(i);
   });
-  const userScroll = () => { if (follow && !audio.paused) { follow = false; $('#r-follow').hidden = false; } else if (follow) { follow = false; $('#r-follow').hidden = false; } };
+  const userScroll = () => { if (cur?.mode === 'read') return; if (follow && !audio.paused) { follow = false; $('#r-follow').hidden = false; } else if (follow) { follow = false; $('#r-follow').hidden = false; } };
   tx.addEventListener('touchmove', userScroll, { passive: true });
   tx.addEventListener('wheel', userScroll, { passive: true });
   swipeDown(R.querySelector('.rd-top'), () => history.state?.r ? history.back() : closeReader());
   renderReader(); renderMini();
+}
+function firstVisibleSeg() {
+  const tx = $('#tx'); if (!tx || !tr) return -1;
+  const top = tx.getBoundingClientRect().top + 8;
+  for (const el of tx.querySelectorAll('.sg')) if (el.getBoundingClientRect().bottom > top) return +el.dataset.seg;
+  return -1;
+}
+function setMode(m) {
+  if (!cur) return;
+  cur.mode = m === 'read' ? 'read' : 'listen'; putBook(cur);
+  const read = cur.mode === 'read';
+  if (read) { audio.pause(); showShadowBar(false); stopAt = null; }
+  $('#tx')?.classList.toggle('reading', read);
+  const pl = $('#r-player'), rb = $('#r-readbar');
+  if (pl) pl.hidden = read; if (rb) rb.hidden = !read;
+  $$('.mode-seg [data-mode]').forEach(b => b.setAttribute('aria-pressed', b.dataset.mode === cur.mode));
+  if (!read) { follow = true; $('#r-follow').hidden = true; activeW = -1; activeSeg = -1; syncWords(audio.currentTime || cur.pos.t); scrollToActive(true); }
+  else $('#r-follow').hidden = true;
 }
 function closeReader() { $('#reader').classList.remove('open'); document.body.style.overflow = ''; closeSheet(true); renderMini(); render(); }
 addEventListener('popstate', () => { if ($('#reader').classList.contains('open')) closeReader(); });
@@ -966,6 +1006,8 @@ function renderReader() {
   activeW = -1; activeSeg = -1; follow = true; $('#r-follow').hidden = true;
   syncWords(audio.src ? audio.currentTime : cur.pos.t);
   scrollToActive(false);
+  setMode(cur.mode || 'listen');
+  if (cur.mode === 'read') { const el = document.querySelector(`.sg[data-seg="${activeSeg}"]`); if (el) el.scrollIntoView({ block: 'start' }); }
 }
 function paint() {
   if (!tr) return;
@@ -973,15 +1015,25 @@ function paint() {
   for (const w of tr.words) {
     const tok = cleanTok(w.w); if (!w.el) continue;
     w.el.classList.remove('new', 'learning');
-    if (!tok) continue;
+    if (!tok || w.name) continue;
     const st = wordStatus(tok); total++;
     if (st === 'known') k++; else if (st === 'new') fresh.add(tok);
-    if (!colorize) continue;
     if (st === 'learning') w.el.classList.add('learning');
-    else if (st === 'new' && common.size) w.el.classList.add('new');
+    else if (st === 'new' && freqRank.size && level !== 'off') w.el.classList.add('new');
   }
-  const c = $('#r-comp');
-  if (c) c.innerHTML = common.size && total ? `<span class="pill acc num">Понятно ≈${Math.round(k / total * 100)}%</span><span class="pill num">${fresh.size} ${plural(fresh.size, 'новое слово', 'новых слова', 'новых слов')}</span>` : '';
+  const c = $('#r-pills');
+  if (c) {
+    c.innerHTML = freqRank.size && total ? `<span class="pill acc num">Понятно ≈${Math.round(k / total * 100)}%</span><button class="pill num" id="r-new">${level === 'off' ? 'Подчёркивание выключено' : `${fresh.size} ${plural(fresh.size, 'редкое слово', 'редких слова', 'редких слов')}`} ⓘ</button>` : '';
+    c.querySelector('#r-new')?.addEventListener('click', levelSheet);
+  }
+}
+function levelSheet() {
+  const opt = (k, title, sub) => `<button class="opt ${level === k ? 'sel' : ''}" data-l="${k}"><span>${title}</span><span>${sub}</span></button>`;
+  openSheet(`<h3>Что значит подчёркивание</h3>
+    <p>Пунктиром подчёркнуты слова, которые могут быть вам незнакомы: их нет среди самых частых слов английского. Имена не подчёркиваются. Тапните по слову, чтобы увидеть перевод; «Уже знаю» уберёт подчёркивание у этого слова насовсем, а слова из словаря подсвечены фоном.</p>
+    <div class="opts">${opt('less', 'Меньше', 'только редкие слова')}${opt('more', 'Больше', 'всё за пределами 5000 частых')}${opt('off', 'Не подчёркивать', 'чистый текст')}</div>`, el => {
+    el.querySelectorAll('[data-l]').forEach(b => b.onclick = () => { level = b.dataset.l; lsSet('et-level', level); paint(); closeSheet(); });
+  });
 }
 function syncWords(t) {
   if (!tr) return;
@@ -994,7 +1046,7 @@ function syncWords(t) {
   activeW = idx;
   if (idx < 0 || !W[idx]?.el) return;
   W[idx].el.classList.remove('read'); W[idx].el.classList.add('active');
-  if (W[idx].seg !== activeSeg) { activeSeg = W[idx].seg; if (follow) scrollToActive(true); }
+  if (W[idx].seg !== activeSeg) { activeSeg = W[idx].seg; if (follow && cur?.mode !== 'read') scrollToActive(true); }
 }
 let scrollT = null;
 function scrollToActive(smooth) {
@@ -1056,15 +1108,15 @@ function jumpToSeg(si) {
 function moreSheet() {
   const b = cur;
   openSheet(`<h3>${esc(b.title)}</h3>
-    <button class="toggle" role="switch" aria-checked="${colorize}" id="m-color"><span>Подсвечивать новые слова</span><i></i></button>
-    <div class="opts" style="margin-top:8px">
+    <div class="opts">
+      <button class="opt" data-a="lvl">Подчёркивание: ${({ less: 'меньше', more: 'больше', off: 'выключено' })[level]} <span>›</span></button>
       <button class="opt" data-a="ai">ИИ для разбора слов: ${aiLabel()} <span>›</span></button>
       <button class="opt" data-a="tr">Добавить расшифровки (.json) <span>›</span></button>
       <button class="opt" data-a="cover">Сменить обложку <span>›</span></button>
       <button class="opt" data-a="edit">Изменить название <span>›</span></button>
       <button class="opt dz" data-a="del">Удалить книгу с телефона</button>
     </div>`, el => {
-    el.querySelector('#m-color').onclick = e => { colorize = !colorize; lsSet('et-color', colorize ? '1' : '0'); e.currentTarget.setAttribute('aria-checked', colorize); paint(); };
+    el.querySelector('[data-a=lvl]').onclick = levelSheet;
     el.querySelector('[data-a=ai]').onclick = () => keySheet();
     el.querySelector('[data-a=tr]').onclick = () => { closeSheet(); pendingAttach = b; $('#f-files').click(); };
     el.querySelector('[data-a=cover]').onclick = () => { closeSheet(); pickCover(b); };
@@ -1116,7 +1168,7 @@ async function lookupWord(i) {
     <div class="lk-main"><button class="btn ghost" id="lk-known">Уже знаю</button><button class="btn primary" id="lk-save">${inVocab ? 'В словаре ✓' : 'В словарь'}</button></div>`, el => {
     el.querySelector('#lk-say').onclick = () => speak(word);
     el.querySelector('#lk-ph').onclick = () => playRange(sg.s, sg.e);
-    el.querySelector('#lk-here').onclick = () => { closeSheet(); seekToWord(i); };
+    el.querySelector('#lk-here').onclick = () => { closeSheet(); if (cur.mode === 'read') setMode('listen'); seekToWord(i); };
     el.querySelector('#lk-trs').onclick = () => translateSentence(el);
     el.querySelector('#lk-save').onclick = () => saveWord(el);
     el.querySelector('#lk-known').onclick = () => { const t = cleanTok(word); if (t) { known.add(t); saveKnown(); paint(); } closeSheet(); toast('Отмечено как знакомое'); };

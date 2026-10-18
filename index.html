@@ -333,15 +333,18 @@ header.top .add-ic{width:40px;height:40px}
 .set-seg{width:100%}
 .set-seg button{flex:1;justify-content:center;height:36px}
 .tabbar{position:fixed;left:0;right:0;bottom:0;z-index:22;display:grid;grid-template-columns:repeat(3,1fr);background:color-mix(in srgb,var(--bg) 88%,transparent);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border-top:1px solid var(--line);padding:6px max(8px,env(safe-area-inset-right,0px)) calc(6px + env(safe-area-inset-bottom,0px)) max(8px,env(safe-area-inset-left,0px))}
-.tabbar button{display:grid;justify-items:center;gap:2px;padding:4px 0;font-size:11px;font-weight:600;color:var(--fg-3)}
+.tabbar button{height:50px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;padding:0;font-size:11px;font-weight:600;line-height:1;color:var(--fg-3)}
+.tb-l{display:block;line-height:13px;height:13px}
 .tabbar button[aria-selected="true"]{color:var(--accent)}
 .tabbar svg *{transition:fill .15s}
 .tabbar button[aria-selected="true"] svg :not(.nofill){fill:currentColor}
-.tb-ic{position:relative;display:block}
+.tb-ic{position:relative;display:block;width:24px;height:24px;line-height:0;flex:none}
+.tb-ic svg{display:block}
 .tb-badge{position:absolute;top:-4px;right:-10px;min-width:18px;height:18px;padding:0 5px;border-radius:9px;background:var(--danger);color:#fff;font-size:11px;font-style:normal;font-weight:700;display:grid;place-items:center}
 .tb-badge[hidden]{display:none}
 .mini{bottom:calc(58px + env(safe-area-inset-bottom,0px))!important;padding-bottom:8px!important}
 main{padding-bottom:calc(84px + env(safe-area-inset-bottom,0px))!important}
+main{min-height:calc(100dvh - 64px)}
 body.has-mini main{padding-bottom:calc(164px + env(safe-area-inset-bottom,0px))!important}
 .pv-hint{display:block;width:100%;text-align:left;margin-top:12px;padding:10px 12px;border-radius:var(--r-s);background:var(--accent-soft);color:var(--fg);font-size:14px}
 .pv-hint b{color:var(--accent)}
@@ -485,9 +488,9 @@ button.pill{cursor:pointer}
 <main class="wrap" id="main"></main>
 <div class="mini" id="mini" hidden></div>
 <nav class="tabbar" id="tabbar" aria-label="Разделы">
-  <button data-tab="books" aria-selected="true"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 5h7a3 3 0 0 1 3 3v12a2 2 0 0 0-2-2H2zM22 5h-7a3 3 0 0 0-3 3v12a2 2 0 0 1 2-2h8z"/></svg><span>Книги</span></button>
-  <button data-tab="vocab" aria-selected="false"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21l-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg><span>Словарь</span></button>
-  <button data-tab="cards" aria-selected="false"><span class="tb-ic"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="7" width="14" height="14" rx="2"/><path class="nofill" d="M7 3h12a2 2 0 0 1 2 2v12"/></svg><i class="tb-badge num" id="cnt-c" hidden>0</i></span><span>Карточки</span></button>
+  <button data-tab="books" aria-selected="true"><span class="tb-ic"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 5h7a3 3 0 0 1 3 3v12a2 2 0 0 0-2-2H2zM22 5h-7a3 3 0 0 0-3 3v12a2 2 0 0 1 2-2h8z"/></svg></span><span class="tb-l">Книги</span></button>
+  <button data-tab="vocab" aria-selected="false"><span class="tb-ic"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21l-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg></span><span class="tb-l">Словарь</span></button>
+  <button data-tab="cards" aria-selected="false"><span class="tb-ic"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="7" width="14" height="14" rx="2"/><path class="nofill" d="M7 3h12a2 2 0 0 1 2 2v12"/></svg><i class="tb-badge num" id="cnt-c" hidden>0</i></span><span class="tb-l">Карточки</span></button>
 </nav>
 <section class="reader" id="reader" aria-label="Чтение"></section>
 <div class="drop-ov">Отпустите, чтобы добавить книгу</div>

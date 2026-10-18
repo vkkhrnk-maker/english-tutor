@@ -312,6 +312,8 @@ header.top .add-ic{order:2;width:40px;height:40px}
 header.top .seg{order:3}
 header.top .brand{order:1}
 header.top .tabs{order:4}
+.pv-hint{display:block;width:100%;text-align:left;margin-top:12px;padding:10px 12px;border-radius:var(--r-s);background:var(--accent-soft);color:var(--fg);font-size:14px}
+.pv-hint b{color:var(--accent)}
 .lk-phrase{font-size:22px;line-height:1.3}
 .sel-fab{left:50%!important;right:auto!important;transform:translateX(-50%);height:44px}
 .ai-cta{display:grid;gap:6px;justify-items:start;margin-top:14px;padding:14px;border-radius:var(--r-m);background:var(--accent-soft)}
@@ -350,8 +352,9 @@ button.pill{cursor:pointer}
 .tx{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:none;position:relative}
 .tx::-webkit-scrollbar{display:none}
 .tx-in{max-width:680px;margin:0 auto;padding:8px max(20px,env(safe-area-inset-left,0px)) 40vh max(20px,env(safe-area-inset-right,0px));font-family:var(--read-font);font-size:19px;line-height:1.7}
-.sg{margin:0 0 .9em;color:var(--fg)}
-.sg.ch{font-family:var(--font);font-weight:700;font-size:15px;letter-spacing:.06em;text-transform:uppercase;color:var(--accent);margin-top:1.4em}
+.para{margin:0 0 1em;color:var(--fg)}
+.para.ch{font-family:var(--font);font-weight:700;font-size:15px;letter-spacing:.06em;text-transform:uppercase;color:var(--accent);margin-top:1.6em}
+.sg{border-radius:4px}
 .w{border-radius:4px;padding:0 1px;margin:0 -1px;cursor:pointer;transition:background .12s,color .12s;-webkit-tap-highlight-color:transparent}
 .w.read{color:var(--fg-2)}
 .w.new{text-decoration:underline dotted color-mix(in srgb,var(--accent) 70%,transparent);text-underline-offset:5px;text-decoration-thickness:1.5px}
@@ -930,6 +933,9 @@ function speak(text) {
 }
 
 /* ---------- reader ---------- */
+// "Mr." and "Mrs." end with a dot but don't end the sentence
+const ABBR = /^(mr|mrs|ms|dr|st|prof|sr|jr|mt|vs|etc|j|k|e\.g|i\.e)\.$/i;
+const sentenceEnds = w => /[.!?…"”»:]$/.test(w) && !ABBR.test(w.replace(/^[^A-Za-z]+/, ''));
 function buildTranscript(c) {
   const segs = [], words = [];
   const chRe = /^\s*chapter\b/i;
@@ -938,7 +944,7 @@ function buildTranscript(c) {
     for (const [w, s, e] of sg[2]) {
       // a capitalised word mid-sentence is a name (Vernon, Hogwarts): not underlined, not counted
       const prev = words[words.length - 1]?.w || '';
-      const start = !prev || /[.!?…"”»:]$/.test(prev);
+      const start = !prev || sentenceEnds(prev);
       words.push({ w, s, e, seg: si, el: null, name: !start && /^[A-Z]/.test(w.replace(/^[^A-Za-z]+/, '')) && w !== 'I' && !/^I'/.test(w) });
     }
     const t = sg[2].map(x => x[0]).join(' ');
@@ -1045,15 +1051,24 @@ function renderReader() {
     box.innerHTML = `<div class="tx-empty">Для этой части нет расшифровки, поэтому текста нет. Её можно просто слушать.<br><br>Чтобы появился текст, добавьте файл .json с именем «${esc(p.name)}.json» через «Ещё → Добавить расшифровки».</div>`;
     $('#r-comp').innerHTML = '';
   } else {
+    // speech segments break on pauses, not on sentences: flow them into paragraphs,
+    // starting a new one only after a sentence ends and the reader pauses (or the paragraph is long)
     const frag = document.createDocumentFragment();
+    let para = null, paraLen = 0;
     tr.segs.forEach((sg, si) => {
-      const el = document.createElement('p'); el.className = 'sg' + (sg.ch ? ' ch' : ''); el.dataset.seg = si;
+      const prev = tr.segs[si - 1];
+      const prevEnds = !prev || sentenceEnds(tr.words[prev.wi1 - 1]?.w || '');
+      const gap = prev ? sg.s - prev.e : 0;
+      if (sg.ch || prev?.ch || !para || (prevEnds && (gap > 1.1 || paraLen > 650))) {
+        para = document.createElement('p'); para.className = 'para' + (sg.ch ? ' ch' : ''); frag.appendChild(para); paraLen = 0;
+      }
+      const el = document.createElement('span'); el.className = 'sg'; el.dataset.seg = si;
       for (let i = sg.wi0; i < sg.wi1; i++) {
         const w = tr.words[i], span = document.createElement('span');
         span.className = 'w'; span.textContent = w.w; span.dataset.i = i; w.el = span;
         el.appendChild(span); el.appendChild(document.createTextNode(' '));
       }
-      frag.appendChild(el);
+      para.appendChild(el); paraLen += sg.t.length;
     });
     box.innerHTML = ''; box.appendChild(frag);
     paint();
@@ -1295,26 +1310,59 @@ async function lookupPhrase(i0, i1) {
 
 /* ---------- word lookup ---------- */
 let look = null;   // { word, i, seg, sentence, data }
+function sentenceAround(i) {
+  const W = tr.words; let a = i, b = i;
+  while (a > 0 && i - a < 60 && !sentenceEnds(W[a - 1].w)) a--;
+  while (b < W.length - 1 && b - i < 60 && !sentenceEnds(W[b].w)) b++;
+  return { a, b, text: W.slice(a, b + 1).map(x => x.w).join(' ') };
+}
+const PARTICLES = new Set('out up off down away back over in on through around round about along apart aside forward into onto across by'.split(' '));
+const FUNC = new Set("the a an to of and or but so if as at for from with without is are was were be been being am has have had do does did not no that this these those it its he she they we you i his her their our your my me him them us who which what when where there here than then very more most much such just only also".split(' '));
+function particlePair(i) {
+  const W = tr.words, t = k => cleanTok(W[k]?.w || ''), punct = k => /[.,;:!?…"”»]$/.test(W[k]?.w || '');
+  // "down the hill", "into his room": a preposition before a noun phrase, not a phrasal verb
+  const DET = new Set('the a an his her their my your its our this that these those some every'.split(' '));
+  const prep = k => !punct(k) && DET.has(t(k + 1));
+  // only when the particle itself is tapped: alone it means nothing; a tapped verb is left to the AI
+  if (PARTICLES.has(t(i)) && !prep(i) && t(i - 1) && !FUNC.has(t(i - 1)) && !PARTICLES.has(t(i - 1)) && !punct(i - 1)) return [i - 1, i];
+  return null;
+}
+// find the expression's words in the sentence, in order, around the tapped word (allows "put the cat out")
+function locateExpression(expr, i, a, b) {
+  const toks = expr.toLowerCase().split(/\s+/).map(cleanTok).filter(Boolean);
+  if (toks.length < 2) return null;
+  const W = tr.words;
+  for (let start = Math.max(a, i - 6); start <= i; start++) {
+    const idx = []; let k = start;
+    for (const t of toks) { while (k <= Math.min(b, start + toks.length + 4) && cleanTok(W[k].w) !== t && cleanTok(W[k].w).replace(/'s$/, '') !== t) k++; if (k > b || cleanTok(W[k]?.w || '') === '' ) break; idx.push(k); k++; }
+    if (idx.length === toks.length && idx.includes(i)) return idx;
+  }
+  return null;
+}
 async function lookupWord(i) {
   const w = tr?.words[i]; if (!w) return;
   audio.pause();
   $$('.w.sel').forEach(x => x.classList.remove('sel')); w.el?.classList.add('sel');
-  const sg = tr.segs[w.seg];
+  const sa = sentenceAround(i), W = tr.words;
   const word = w.w.replace(/^[^A-Za-z'’\-]+|[^A-Za-z'’\-]+$/g, '') || w.w;
-  const sentence = sg.t;
-  look = { word, i, seg: w.seg, sentence, data: null, sentTr: null };
+  const sentence = sa.text;
+  look = { word, i, seg: W[sa.a].seg, segEnd: W[sa.b].seg, sentence, data: null, sentTr: null };
   const inVocab = vocab.some(v => v.word.toLowerCase() === word.toLowerCase());
-  const marked = sentence.split(' ').map((x, k) => k === i - sg.wi0 ? `<mark>${esc(x)}</mark>` : esc(x)).join(' ');
+  const markSent = idx => W.slice(sa.a, sa.b + 1).map((x, k) => idx.includes(sa.a + k) ? `<mark>${esc(x.w)}</mark>` : esc(x.w)).join(' ').replace(/<\/mark> <mark>/g, ' ');
+  const marked = markSent([i]);
+  const pair = particlePair(i);
   openSheet(`<div class="lk-word">${esc(word)} <button class="ibtn" id="lk-say" aria-label="Произнести">${I.speaker}</button></div>
     <div class="lk-meta" id="lk-meta"></div>
     <div id="lk-body"><span class="skel" style="width:55%;height:24px;margin-top:16px"></span><span class="skel" style="width:90%;margin-top:12px"></span><span class="skel" style="width:75%"></span><span class="skel" style="width:60%;margin-top:12px"></span></div>
-    <div class="lk-sent">${marked}<div class="lk-sent-tr" id="lk-str" hidden></div></div>
+    ${pair && !aiKey() ? `<button class="pv-hint" id="lk-pv">Похоже на фразовый глагол: <b>${esc(W[pair[0]].w + ' ' + W[pair[1]].w).replace(/[.,;:!?"”»]+/g, '')}</b> — разобрать вместе</button>` : ''}
+    <div class="lk-sent" id="lk-sent">${marked}<div class="lk-sent-tr" id="lk-str" hidden></div></div>
     <div class="lk-links"><button class="lnk" id="lk-ph">Прослушать фразу</button><button class="lnk" id="lk-trs">Перевести</button><button class="lnk" id="lk-here">Слушать отсюда</button></div>
     <button class="btn ghost lk-claude" id="lk-claude">${I.chat} Спросить в Claude</button>
     <div class="lk-main"><button class="btn ghost" id="lk-known">Уже знаю</button><button class="btn primary" id="lk-save">${inVocab ? 'В словаре ✓' : 'В словарь'}</button></div>`, el => {
     el.querySelector('#lk-say').onclick = () => speak(word);
     el.querySelector('#lk-claude').onclick = () => openLink(claudeAsk(word, sentence, false));
-    el.querySelector('#lk-ph').onclick = () => playRange(sg.s, sg.e);
+    el.querySelector('#lk-ph').onclick = () => playRange(W[sa.a].s, W[sa.b].e);
+    el.querySelector('#lk-pv')?.addEventListener('click', () => lookupPhrase(pair[0], pair[1]));
     el.querySelector('#lk-here').onclick = () => { closeSheet(); if (cur.mode === 'read') setMode('listen'); seekToWord(i); };
     el.querySelector('#lk-trs').onclick = () => translateSentence(el);
     el.querySelector('#lk-save').onclick = () => saveWord(el);
@@ -1325,7 +1373,17 @@ async function lookupWord(i) {
   if (look !== me || !document.getElementById('lk-body')) return;
   look.data = data;
   if (data.error) { $('#lk-body').innerHTML = `<div class="lk-mean">${esc(data.error)}</div>`; return; }
-  $('#lk-meta').textContent = [data.pos, data.lemma && data.lemma.toLowerCase() !== word.toLowerCase() ? data.lemma : ''].filter(Boolean).join(' · ');
+  // the AI says the word belongs to a phrasal verb or idiom: show and save the whole expression
+  const idx = data.expression ? locateExpression(data.expression, i, sa.a, sa.b) : null;
+  if (idx) {
+    const expr = idx.map(k => W[k].w).join(' ').replace(/[.,;:!?"”»]+/g, '');
+    look.word = expr; look.i = Math.min(...idx); look.iEnd = Math.max(...idx); look.phrase = true;
+    $$('.w.sel').forEach(x => x.classList.remove('sel')); idx.forEach(k => W[k].el?.classList.add('sel'));
+    const head = document.querySelector('.lk-word'); if (head) { head.firstChild.textContent = expr + ' '; head.classList.add('lk-phrase'); }
+    const sent = $('#lk-sent'); if (sent) sent.firstChild && (sent.innerHTML = markSent(idx) + '<div class="lk-sent-tr" id="lk-str" hidden></div>');
+    const sv = $('#lk-save'); if (sv) sv.textContent = vocab.some(v => v.word.toLowerCase() === expr.toLowerCase()) ? 'В словаре ✓' : 'В словарь';
+  }
+  $('#lk-meta').textContent = [data.pos, data.lemma && data.lemma.toLowerCase() !== look.word.toLowerCase() ? data.lemma : ''].filter(Boolean).join(' · ');
   $('#lk-body').innerHTML = `<div class="lk-tr">${esc(data.translation_ru || '—')}</div>
     ${data.meaning_en ? `<div class="lk-mean">${esc(data.meaning_en)}</div>` : ''}
     ${data.example ? `<div class="lk-ex">${esc(data.example)}</div>` : ''}
@@ -1355,10 +1413,11 @@ async function translateSentence(el) {
 }
 
 /* ---------- explanations: AI (Claude / Gemini by your key) or the free dictionary ---------- */
-const WORD_SCHEMA = { type: 'object', properties: { lemma: { type: 'string' }, pos: { type: 'string' }, translation_ru: { type: 'string' }, meaning_en: { type: 'string' }, example: { type: 'string' }, note: { type: 'string' } }, required: ['lemma', 'pos', 'translation_ru', 'meaning_en', 'example', 'note'], additionalProperties: false };
+const WORD_SCHEMA = { type: 'object', properties: { expression: { type: 'string' }, lemma: { type: 'string' }, pos: { type: 'string' }, translation_ru: { type: 'string' }, meaning_en: { type: 'string' }, example: { type: 'string' }, note: { type: 'string' } }, required: ['expression', 'lemma', 'pos', 'translation_ru', 'meaning_en', 'example', 'note'], additionalProperties: false };
 const SENT_SCHEMA = { type: 'object', properties: { translation_ru: { type: 'string' }, note: { type: 'string' } }, required: ['translation_ru', 'note'], additionalProperties: false };
 const WORD_PROMPT = (word, sentence) => `You are a concise English tutor for a Russian-speaking learner reading an English book. Explain the word AS USED in the sentence.
-Fields: lemma (base dictionary form); pos (part of speech, short, in Russian, e.g. «глагол»); translation_ru (Russian translation that fits THIS context); meaning_en (simple English definition, up to 12 words); example (one short natural English example sentence); note (short Russian hint, up to 2 sentences: flag a phrasal verb or idiom in this sentence and explain it, or a tricky grammar or British/cultural point; otherwise an empty string).
+First decide whether, in this sentence, the word is part of a phrasal verb (verb + particle like "break out", "beat up", "put ... out"), an idiom or a fixed expression whose meaning is lost if the word is taken alone. If it is, explain the WHOLE expression in every field below.
+Fields: expression (that whole expression exactly as its words appear in the sentence, in order, e.g. "had broken out" → "broken out"; empty string if the word stands on its own); lemma (base dictionary form: of the expression if there is one, e.g. "break out"); pos (part of speech, short, in Russian: «глагол», «фразовый глагол», «идиома»…); translation_ru (Russian translation that fits THIS context); meaning_en (simple English definition, up to 12 words); example (one short natural English example sentence); note (short Russian hint, up to 2 sentences: flag a phrasal verb or idiom in this sentence and explain it, or a tricky grammar or British/cultural point; otherwise an empty string).
 
 Word: "${word}"
 Sentence: "${sentence}"`;

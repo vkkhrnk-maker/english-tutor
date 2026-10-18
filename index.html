@@ -313,6 +313,14 @@ input[type=range]:active::-webkit-slider-thumb{transform:scale(1.25)}
 .lib-head img{width:88px;height:88px;border-radius:var(--r-s);flex:none;object-fit:cover}
 .lib-head h3{margin:2px 0 6px}
 .demo-note{font-size:12px!important;color:var(--fg-3)!important;margin-top:4px!important}
+.tr-offer{display:grid;gap:10px;justify-items:center}
+.tr-offer b{font-size:17px;color:var(--fg)}
+.tr-offer .acts{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin-top:6px}
+.tr-status{display:grid;grid-template-columns:1fr auto;gap:6px 10px;align-items:center;margin:0 16px 8px;padding:10px 12px;border-radius:var(--r-m);background:var(--accent-soft);font-size:13px;font-weight:600;color:var(--accent);flex:none}
+.tr-status[hidden]{display:none}
+.tr-status .pbar{grid-column:1/-1;height:4px}
+.tr-status .lnk{font-size:13px}
+.tr-more{display:grid;gap:10px;justify-items:center;margin:24px 0;padding:16px;border-radius:var(--r-m);background:var(--surface);font-family:var(--font);font-size:14px;color:var(--fg-2)}
 .goal{display:flex;align-items:center;gap:14px;width:100%;text-align:left;background:var(--surface);border-radius:var(--r-l);padding:14px 16px;margin-top:16px}
 .g-ring{width:52px;height:52px;border-radius:50%;flex:none;display:grid;place-items:center;background:conic-gradient(var(--accent) var(--p),var(--surface-2) 0)}
 .g-ring span{width:40px;height:40px;border-radius:50%;background:var(--surface);display:grid;place-items:center;font-size:12px;font-weight:700;color:var(--accent)}
@@ -562,7 +570,7 @@ const lsSet = (k, v) => { try { localStorage.setItem(k, v); } catch {} };
 let books = [], cur = null, curUrl = null, viewing = null;
 let vocab = [], known = new Set(), freqRank = new Map(), lookCache = {};
 let tr = null;               // current part transcript: { segs: [{s,e,t,wi0,wi1,ch}], words: [{w,s,e,seg,el}] }
-let activeW = -1, activeSeg = -1, follow = true, shadow = lsGet('et-shadow') === '1', level = LEVELS[lsGet('et-level')] !== undefined ? lsGet('et-level') : 'less';
+let activeW = -1, activeSeg = -1, follow = true, shadow = lsGet('et-shadow') === '1', level = LEVELS[lsGet('et-level')] !== undefined ? lsGet('et-level') : 'off';   // underlining guesses at what you know: off unless you turn it on
 let shadowPaused = -1, stopAt = null, curTab = 'books';
 const coverUrls = new Map();
 
@@ -978,7 +986,7 @@ async function loadPart(i, t = 0, autoplay = true) {
     if (isFinite(audio.duration) && !p.duration) { p.duration = audio.duration; putBook(b); }
   }, { once: true });
   tr = null; activeW = -1; activeSeg = -1;
-  if (p.tr) { const c = await getFile(p.tr); if (c) buildTranscript(c); }
+  if (p.tr) { const c = await getFile(p.tr); if (c && c.s?.length) buildTranscript(c); }
   if (autoplay) { try { await audio.play(); } catch {} } else audio.load();
   mediaMeta(); renderReader(); renderMini();
 }
@@ -1075,6 +1083,7 @@ function openReader() {
       <div class="rd-title"><b id="r-book"></b><small id="r-part"></small></div>
       <button class="ibtn" id="r-nav" aria-label="Части, главы и поиск">${I.list}</button><button class="ibtn" id="r-more" aria-label="Ещё">${I.more}</button></div>
     <div class="rd-comp" id="r-comp"><div class="seg mode-seg" role="group" aria-label="Режим"><button data-mode="listen">Слушать</button><button data-mode="read">Читать</button></div></div>
+    <div class="tr-status" id="tr-status" hidden><span class="trs-t"></span><button class="lnk" id="trs-stop">Пауза</button><div class="pbar"><i></i></div></div>
     <div class="tx" id="tx"><div class="tx-in" id="tx-in"></div></div>
     <div class="follow-wrap"><button class="btn ghost" id="r-follow" hidden>К текущему месту</button><button class="btn primary sel-fab" id="sel-fab" hidden>Разобрать фразу</button></div>
     <div class="rd-bottom"><div class="wrap readbar" id="r-readbar" hidden><button class="btn primary" id="r-listen-here">Слушать с этого места</button></div><div class="wrap" id="r-player">
@@ -1101,6 +1110,7 @@ function openReader() {
   $('#sh-again').onclick = () => { shadowPaused = -1; replaySentence(); };
   $('#sh-next').onclick = () => { showShadowBar(false); audio.play().catch(() => {}); };
   $('#r-nav').onclick = navSheet;
+  $('#trs-stop').onclick = () => { if (trJob) { trJob.stop = true; toast('Остановлю после текущего куска'); } };
   $$('.mode-seg [data-mode]').forEach(b => b.onclick = () => setMode(b.dataset.mode));
   $('#r-listen-here').onclick = () => { const si = firstVisibleSeg(); setMode('listen'); if (tr && si >= 0) { audio.currentTime = tr.segs[si].s + 0.01; } follow = true; audio.play().catch(() => {}); };
   let readT;
@@ -1159,7 +1169,9 @@ function renderReader() {
   $('#r-part').textContent = cur.parts.length > 1 ? `Часть ${cur.pos.part + 1} из ${cur.parts.length}` : '';
   const box = $('#tx-in');
   if (!tr) {
-    box.innerHTML = `<div class="tx-empty">Для этой части нет расшифровки, поэтому текста нет. Её можно просто слушать.<br><br>Чтобы появился текст, добавьте файл .json с именем «${esc(p.name)}.json» через «Ещё → Добавить расшифровки».</div>`;
+    box.innerHTML = trJob && trJob.bookId === cur.id && trJob.part === cur.pos.part ? `<div class="tx-empty"><b>Расшифровка началась</b><br>Текст появится здесь через минуту и будет дополняться.</div>` : trOfferHTML(cur, cur.pos.part);
+    box.querySelector('#tr-one')?.addEventListener('click', () => startTranscription(cur, [cur.pos.part]));
+    box.querySelector('#tr-all')?.addEventListener('click', () => startTranscription(cur, cur.parts.map((x, k) => (!x.tr || x.trPartial) ? k : -1).filter(k => k >= 0)));
     $('#r-comp').innerHTML = '';
   } else {
     // speech segments break on pauses, not on sentences: flow them into paragraphs,
@@ -1184,7 +1196,8 @@ function renderReader() {
     box.innerHTML = ''; box.appendChild(frag);
     paint();
   }
-  renderChips(); playIcon(); updateSeek();
+  renderChips(); playIcon(); updateSeek(); renderTrStatus();
+  if (tr && cur.parts[cur.pos.part]?.trPartial && !trJob) box.insertAdjacentHTML('beforeend', `<div class="tr-more"><span>Дальше текст ещё не расшифрован</span><button class="btn primary" id="tr-cont">Продолжить расшифровку</button></div>`), box.querySelector('#tr-cont').onclick = () => startTranscription(cur, [cur.pos.part]);
   activeW = -1; activeSeg = -1; follow = true; $('#r-follow').hidden = true;
   syncWords(audio.src ? audio.currentTime : cur.pos.t);
   scrollToActive(false);
@@ -1212,9 +1225,9 @@ function toggleShadow() {
 }
 function levelSheet() {
   const opt = (k, title, sub) => `<button class="opt ${level === k ? 'sel' : ''}" data-l="${k}"><span>${title}</span><span>${sub}</span></button>`;
-  openSheet(`<h3>Что значит подчёркивание</h3>
-    <p>Пунктиром подчёркнуты слова, которые могут быть вам незнакомы: их нет среди самых частых слов английского. Имена не подчёркиваются. Тапните по слову, чтобы увидеть перевод; «Уже знаю» уберёт подчёркивание у этого слова насовсем, а слова из словаря подсвечены фоном.</p>
-    <div class="opts">${opt('less', 'Меньше', 'только редкие слова')}${opt('more', 'Больше', 'всё за пределами 5000 частых')}${opt('off', 'Не подчёркивать', 'чистый текст')}</div>`, el => {
+  openSheet(`<h3>Подчёркивание редких слов</h3>
+    <p>Можно подчёркивать пунктиром слова, которые могут быть вам незнакомы: их нет среди самых частых слов английского. Это только догадка по частоте, поэтому по умолчанию выключено. Имена не подчёркиваются. Тапните по слову, чтобы увидеть перевод; «Уже знаю» уберёт подчёркивание у этого слова насовсем, а слова из словаря подсвечены фоном.</p>
+    <div class="opts">${opt('off', 'Не подчёркивать', 'чистый текст, тапайте по любому слову')}${opt('less', 'Редкие слова', 'за пределами 12 000 частых')}${opt('more', 'Больше', 'всё за пределами 5000 частых')}</div>`, el => {
     el.querySelectorAll('[data-l]').forEach(b => b.onclick = () => { level = b.dataset.l; lsSet('et-level', level); paint(); closeSheet(); });
   });
 }
@@ -1781,6 +1794,193 @@ function settingsSheet() {
     el.querySelector('[data-a=lvl]').onclick = levelSheet;
     el.querySelector('[data-a=ai]').onclick = () => keySheet();
   });
+}
+
+/* ---------- transcription on the phone: Whisper with word timestamps, 30-second chunks ---------- */
+const ASR_MODEL = 'onnx-community/whisper-base.en_timestamped';
+const ASR_WORKER = `
+import { pipeline, env } from 'https://cdn.jsdelivr.net/npm/@huggingface/transformers@4.3.0/+esm';
+env.allowLocalModels = false;
+let pipe = null;
+self.onmessage = async (e) => {
+  const { id, model, audio } = e.data;
+  try {
+    if (!pipe) pipe = await pipeline('automatic-speech-recognition', model, {
+      dtype: 'q8', device: 'wasm',
+      progress_callback: p => { if (p.status === 'progress' && p.total) self.postMessage({ id, type: 'download', file: p.file, loaded: p.loaded, total: p.total }); },
+    });
+    const out = await pipe(audio, { return_timestamps: 'word' });
+    self.postMessage({ id, type: 'done', chunks: (out && out.chunks) || [] });
+  } catch (err) { self.postMessage({ id, type: 'error', message: String(err && err.message || err) }); }
+};`;
+let asrWorker = null, asrSeq = 0;
+const asrJobs = new Map();
+function asrRun(audio, onDownload) {
+  if (!asrWorker) {
+    asrWorker = new Worker(URL.createObjectURL(new Blob([ASR_WORKER], { type: 'text/javascript' })), { type: 'module' });
+    asrWorker.onmessage = e => asrJobs.get(e.data.id)?.(e.data);
+    asrWorker.onerror = e => { for (const h of asrJobs.values()) h({ type: 'error', message: e.message || 'worker' }); asrWorker = null; };
+  }
+  const id = ++asrSeq;
+  return new Promise((res, rej) => {
+    asrJobs.set(id, m => {
+      if (m.type === 'download') onDownload?.(m);
+      else { asrJobs.delete(id); m.type === 'done' ? res(m.chunks) : rej(new Error(m.message)); }
+    });
+    asrWorker.postMessage({ id, model: ASR_MODEL, audio }, [audio.buffer]);
+  });
+}
+// MP3: режем только нужный кусок по границам кадров, чтобы не декодировать всю главу
+async function mp3AudioStart(blob) {
+  const h = new Uint8Array(await blob.slice(0, 10).arrayBuffer());
+  if (h[0] === 0x49 && h[1] === 0x44 && h[2] === 0x33) return 10 + ((h[6]<<21)|(h[7]<<14)|(h[8]<<7)|h[9]) + ((h[5] & 0x10) ? 10 : 0);
+  return 0;
+}
+function mp3FrameLen(b, i) {
+  if (b[i] !== 0xFF || (b[i+1] & 0xE0) !== 0xE0 || ((b[i+1]>>1)&3) !== 1) return 0;
+  const ver = (b[i+1]>>3)&3, brIdx = b[i+2]>>4, srIdx = (b[i+2]>>2)&3, pad = (b[i+2]>>1)&1;
+  const SR = {3:[44100,48000,32000], 2:[22050,24000,16000], 0:[11025,12000,8000]}[ver];
+  const BR = ver===3 ? [0,32,40,48,56,64,80,96,112,128,160,192,224,256,320] : [0,8,16,24,32,40,48,56,64,80,96,112,128,144,160];
+  const sr = SR?.[srIdx], br = BR[brIdx];
+  if (!sr || !br) return 0;
+  return Math.floor((ver===3 ? 144000 : 72000) * br / sr) + pad;
+}
+async function mp3Slice(blob, start, end, duration) {
+  const a0 = await mp3AudioStart(blob);
+  const bps = (blob.size - a0) / duration;
+  let b0 = Math.max(a0, Math.floor(a0 + start * bps)), b1 = Math.min(blob.size, Math.ceil(a0 + end * bps));
+  const win = new Uint8Array(await blob.slice(b0, Math.min(blob.size, b0 + 8192)).arrayBuffer());
+  for (let i = 0; i + 4 < win.length; i++) {
+    const L = mp3FrameLen(win, i);
+    if (L && (i + L + 4 > win.length || mp3FrameLen(win, i + L))) { b0 += i; break; }
+  }
+  return blob.slice(b0, b1, 'audio/mpeg');
+}
+function toMono16k(buf) {
+  const n = buf.numberOfChannels, len = buf.length, mono = new Float32Array(len);
+  for (let c = 0; c < n; c++) { const d = buf.getChannelData(c); for (let i = 0; i < len; i++) mono[i] += d[i] / n; }
+  if (buf.sampleRate === 16000) return mono;
+  const ratio = buf.sampleRate / 16000, out = new Float32Array(Math.floor(len / ratio));
+  for (let i = 0; i < out.length; i++) {           // усреднение по окну: простой фильтр от наложения частот
+    const a = Math.floor(i * ratio), z = Math.min(len, Math.floor((i + 1) * ratio));
+    let s = 0; for (let j = a; j < z; j++) s += mono[j];
+    out[i] = s / Math.max(1, z - a);
+  }
+  return out;
+}
+
+// words → segments: a new one after a sentence end, a pause, or 30 words
+function wordsToCompact(words, d, partial, upTo) {
+  const segs = []; let cur = null;
+  for (const w of words) {
+    const prev = cur && cur[2][cur[2].length - 1];
+    if (!cur || (prev && (sentenceEnds(prev[0]) && w[1] - prev[2] > 0.25 || w[1] - prev[2] > 0.9 || cur[2].length >= 30))) { cur = [w[1], w[2], []]; segs.push(cur); }
+    cur[2].push(w); cur[1] = w[2];
+  }
+  return { d, s: segs, partial: !!partial, upTo };
+}
+let trJob = null;   // { bookId, part, done, total, speed, stop, queue: [part indexes], dl }
+async function transcribePart(b, i) {
+  const p = b.parts[i];
+  const blob = await getFile(p.key);
+  if (!blob) throw new Error('nofile');
+  if (!(/mpeg|mp3/i.test(blob.type) || /\.mp3$/i.test(p.name))) { const h = new Uint8Array(await blob.slice(0, 3).arrayBuffer()); if (!(h[0] === 0x49 && h[1] === 0x44) && !(h[0] === 0xFF)) throw new Error('notmp3'); }
+  const dur = p.duration || await mp3Duration(blob);
+  const old = p.tr ? await getFile(p.tr) : null;
+  const words = old?.partial ? old.s.flatMap(sg => sg[2]) : [];
+  let t = old?.partial ? old.upTo : 0;
+  const STEP = 28, WIN = 30;
+  trJob.total = dur; trJob.done = t;
+  const Ctx = window.AudioContext || window.webkitAudioContext;
+  const ctx = new Ctx();
+  try {
+    while (t < dur - 0.5) {
+      if (trJob.stop) break;
+      const t0 = performance.now();
+      const part = await mp3Slice(blob, t, Math.min(dur, t + WIN), dur);
+      let pcm;
+      try { pcm = toMono16k(await ctx.decodeAudioData(await part.arrayBuffer())); } catch { t += STEP; continue; }
+      const chunks = await asrRun(pcm, m => { trJob.dl = trJob.dl || {}; trJob.dl[m.file] = [m.loaded, m.total]; renderTrStatus(); });
+      trJob.dl = null;
+      const last = t + STEP >= dur - 0.5;
+      for (const c of chunks) {
+        const [a, z] = c.timestamp || [];
+        if (a == null) continue;
+        if (t > 0 && a < 1) continue;                    // already taken from the previous window
+        if (!last && a >= STEP + 1) continue;            // the next window covers it
+        const txt = String(c.text || '').trim(); if (!txt) continue;
+        words.push([txt, +(t + a).toFixed(2), +(t + (z ?? a + 0.3)).toFixed(2)]);
+      }
+      t = Math.min(dur, t + STEP);
+      const audioSec = Math.min(STEP, dur), took = (performance.now() - t0) / 1000;
+      trJob.speed = trJob.speed ? trJob.speed * 0.7 + (audioSec / took) * 0.3 : audioSec / took;
+      trJob.done = t;
+      const c = wordsToCompact(words, dur, t < dur - 0.5, t);
+      await putFile(p.key + ':tr', c);
+      if (!p.tr) { p.tr = p.key + ':tr'; }
+      p.trPartial = c.partial; p.words = words.length; await putBook(b);
+      if (cur?.id === b.id && cur.pos.part === i) liveTranscript(c);
+      renderTrStatus();
+    }
+  } finally { try { ctx.close(); } catch {} }
+}
+let wakeLock = null;
+async function startTranscription(b, parts) {
+  if (trJob) { toast('Расшифровка уже идёт'); return; }
+  trJob = { bookId: b.id, queue: parts.slice(), part: parts[0], done: 0, total: 0, speed: 0, stop: false };
+  try { wakeLock = await navigator.wakeLock?.request('screen'); } catch {}
+  renderTrStatus();
+  let failed = '';
+  try {
+    for (const i of parts) {
+      if (trJob.stop) break;
+      trJob.part = i;
+      await transcribePart(b, i);
+    }
+  } catch (e) {
+    failed = e.message === 'notmp3' ? 'Расшифровка на телефоне пока работает только с MP3' : /fetch|network|Failed to load/i.test(e.message) ? 'Не получилось скачать модель распознавания. Проверьте интернет' : 'Расшифровка остановилась из-за ошибки. Попробуйте ещё раз';
+  }
+  const stopped = trJob.stop;
+  trJob = null;
+  try { await wakeLock?.release(); } catch {} wakeLock = null;
+  toast(failed || (stopped ? 'Расшифровка на паузе. Можно продолжить с того же места' : 'Готово: текст расшифрован'), 4000);
+  render(); if (cur?.id === b.id) renderReader();
+}
+document.addEventListener('visibilitychange', async () => { if (trJob && document.visibilityState === 'visible' && !wakeLock) { try { wakeLock = await navigator.wakeLock?.request('screen'); } catch {} } });
+let liveT = 0;
+function liveTranscript(c) {
+  // re-render now and then while text grows, keeping the reader where it is
+  const now = Date.now(), first = !tr;
+  if (!first && now - liveT < 20000) return;
+  liveT = now;
+  const tx = $('#tx'), keep = tx?.scrollTop;
+  buildTranscript(c);
+  if ($('#reader').classList.contains('open')) { renderReader(); if (!first && tx) tx.scrollTop = keep; }
+}
+function trStatusText() {
+  if (!trJob) return '';
+  if (trJob.dl) { const v = Object.values(trJob.dl); const pct = v.reduce((s, x) => s + x[0], 0) / Math.max(1, v.reduce((s, x) => s + x[1], 0)); return `Скачиваю модель распознавания · ${Math.round(pct * 100)}%`; }
+  const b = books.find(x => x.id === trJob.bookId);
+  const left = trJob.speed ? (trJob.total - trJob.done) / trJob.speed : 0;
+  const many = trJob.queue.length > 1 ? `часть ${trJob.queue.indexOf(trJob.part) + 1} из ${trJob.queue.length} · ` : '';
+  return `Расшифровываю: ${many}${fmt(trJob.done)} из ${fmt(trJob.total)}${left ? ` · осталось ≈${human(left)}` : ''}`;
+}
+function renderTrStatus() {
+  const el = $('#tr-status'); if (!el) return;
+  const mine = trJob && cur && trJob.bookId === cur.id;
+  el.hidden = !mine;
+  if (!mine) return;
+  el.querySelector('.trs-t').textContent = trStatusText();
+  el.querySelector('.pbar i').style.width = (trJob.total ? trJob.done / trJob.total * 100 : 0).toFixed(1) + '%';
+}
+function trOfferHTML(b, i) {
+  const missing = b.parts.map((p, k) => (!p.tr || p.trPartial) ? k : -1).filter(k => k >= 0);
+  const p = b.parts[i];
+  return `<div class="tx-empty tr-offer">
+    <b>${p.trPartial ? 'Расшифровка этой части не закончена' : 'У этой части пока нет текста'}</b>
+    <span>Текст можно получить прямо на телефоне: Whisper расшифрует запись и разметит каждое слово по времени. Один раз скачается модель (≈80 МБ), дальше без интернета. Пока идёт расшифровка, держите приложение открытым.</span>
+    <div class="acts"><button class="btn primary" id="tr-one">${p.trPartial ? 'Продолжить' : 'Расшифровать эту часть'}</button>${missing.length > 1 ? `<button class="btn ghost" id="tr-all">Все части без текста (${missing.length})</button>` : ''}</div>
+  </div>`;
 }
 
 /* ---------- daily goal: minutes of listening + reading ---------- */

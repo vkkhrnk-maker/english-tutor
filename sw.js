@@ -1,5 +1,5 @@
 // Офлайн-кэш оболочки приложения. Сами книги лежат в IndexedDB и через этот файл не проходят.
-const VERSION = 'f943d8431d';
+const VERSION = '945df22598';
 const CACHE = `entutor-${VERSION}`;
 const SHELL = ['./', 'index.html', 'manifest.webmanifest', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/apple-touch-icon.png', 'en-frequency.txt'];
 

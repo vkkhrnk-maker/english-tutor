@@ -296,6 +296,12 @@ header.top .brand{order:1}
 header.top .tabs{order:4}
 .lk-phrase{font-size:22px;line-height:1.3}
 .sel-fab{left:50%!important;right:auto!important;transform:translateX(-50%);height:44px}
+.ai-cta{display:grid;gap:6px;justify-items:start;margin-top:14px;padding:14px;border-radius:var(--r-m);background:var(--accent-soft)}
+.ai-cta b{font-size:15px}
+.ai-cta span{font-size:13px;color:var(--fg-2)}
+.ai-cta .btn{height:38px;padding:0 16px;margin-top:4px}
+.lk-sent-tr .ai-cta{margin-top:6px}
+.lk-claude{width:100%;justify-content:center;margin-top:12px;height:44px}
 .lk-links{display:flex;gap:16px;flex-wrap:wrap;margin-top:10px;font-size:14px}
 .lk-links .lnk{text-decoration:none;font-weight:600}
 .stat{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:8px 0 4px}
@@ -461,6 +467,7 @@ const I = {
   list:'<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg>',
   speaker:'<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5L6 9H3v6h3l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13"/></svg>',
   book:'<svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 5h7a3 3 0 0 1 3 3v12a2 2 0 0 0-2-2H2zM22 5h-7a3 3 0 0 0-3 3v12a2 2 0 0 1 2-2h8z"/></svg>',
+  chat:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/></svg>',
   plus:'<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>',
 };
 
@@ -1191,6 +1198,13 @@ function pickCover(b) {
   inp.click();
 }
 
+// opens the Claude app (or claude.ai) with a ready question — uses your Claude subscription, no API key
+function claudeAsk(text, sentence, isPhrase) {
+  const where = cur ? ` Я слушаю аудиокнигу «${cur.title}»${cur.author ? ` (${cur.author})` : ''}.` : '';
+  const q = `Я учу английский по книге.${where} Объясни, что значит ${isPhrase ? 'фрагмент' : 'слово'} «${text}» в этом предложении:\n\n«${sentence}»\n\nДай перевод именно в этом контексте, простое объяснение, отметь, если это идиома или фразовый глагол, и приведи пару примеров. Не рассказывай, что будет дальше по сюжету.`;
+  return 'https://claude.ai/new?q=' + encodeURIComponent(q);
+}
+
 /* ---------- phrase selection: native long-press selection over the word spans ---------- */
 let selRange = null, selT = null;
 function spanAt(node, fromEnd) {
@@ -1239,13 +1253,16 @@ async function lookupPhrase(i0, i1) {
     <div id="lk-body"><span class="skel" style="width:70%;height:24px;margin-top:16px"></span><span class="skel" style="width:90%;margin-top:12px"></span><span class="skel" style="width:60%"></span></div>
     <div class="lk-sent">${marked.join(' ').replace(/<\/mark> <mark>/g, ' ')}</div>
     <div class="lk-links"><button class="lnk" id="lk-ph">Прослушать фразу целиком</button><button class="lnk" id="lk-here">Слушать отсюда</button></div>
+    <button class="btn ghost lk-claude" id="lk-claude">${I.chat} Спросить в Claude</button>
     <div class="lk-main"><button class="btn ghost" id="lk-close">Закрыть</button><button class="btn primary" id="lk-save">${inVocab ? 'В словаре ✓' : 'В словарь'}</button></div>`, el => {
     el.querySelector('#lk-say').onclick = () => playRange(W[i0].s, W[i1].e);
+    el.querySelector('#lk-claude').onclick = () => openLink(claudeAsk(phrase, sentence, true));
     el.querySelector('#lk-ph').onclick = () => playRange(tr.segs[s0].s, tr.segs[s1].e);
     el.querySelector('#lk-here').onclick = () => { closeSheet(); if (cur.mode === 'read') setMode('listen'); seekToWord(i0); };
     el.querySelector('#lk-close').onclick = () => closeSheet();
     el.querySelector('#lk-save').onclick = () => saveWord(el);
   });
+  if (!aiKey()) { $('#lk-body').innerHTML = AI_CTA; bindCta($('#lk-body')); return; }
   const me = look;
   const data = await explainWord(phrase, sentence, true);
   if (look !== me || !document.getElementById('lk-body')) return;
@@ -1254,8 +1271,7 @@ async function lookupPhrase(i0, i1) {
   if (data.pos) $('#lk-meta').textContent = data.pos + (data.lemma && data.lemma.toLowerCase() !== phrase.toLowerCase() ? ' · ' + data.lemma : '');
   $('#lk-body').innerHTML = `<div class="lk-tr">${esc(data.translation_ru || '—')}</div>
     ${data.meaning_en ? `<div class="lk-mean">${esc(data.meaning_en)}</div>` : ''}
-    ${data.note ? `<div class="lk-note">${esc(data.note)}</div>` : ''}
-    ${data.source === 'dictionary' ? '<div class="lk-mean" style="font-size:13px">Это машинный перевод фрагмента. С ИИ будет перевод с учётом смысла и пояснение идиом: «⋯» → «ИИ для разбора слов».</div>' : ''}`;
+    ${data.note ? `<div class="lk-note">${esc(data.note)}</div>` : ''}`;
 }
 
 /* ---------- word lookup ---------- */
@@ -1275,8 +1291,10 @@ async function lookupWord(i) {
     <div id="lk-body"><span class="skel" style="width:55%;height:24px;margin-top:16px"></span><span class="skel" style="width:90%;margin-top:12px"></span><span class="skel" style="width:75%"></span><span class="skel" style="width:60%;margin-top:12px"></span></div>
     <div class="lk-sent">${marked}<div class="lk-sent-tr" id="lk-str" hidden></div></div>
     <div class="lk-links"><button class="lnk" id="lk-ph">Прослушать фразу</button><button class="lnk" id="lk-trs">Перевести</button><button class="lnk" id="lk-here">Слушать отсюда</button></div>
+    <button class="btn ghost lk-claude" id="lk-claude">${I.chat} Спросить в Claude</button>
     <div class="lk-main"><button class="btn ghost" id="lk-known">Уже знаю</button><button class="btn primary" id="lk-save">${inVocab ? 'В словаре ✓' : 'В словарь'}</button></div>`, el => {
     el.querySelector('#lk-say').onclick = () => speak(word);
+    el.querySelector('#lk-claude').onclick = () => openLink(claudeAsk(word, sentence, false));
     el.querySelector('#lk-ph').onclick = () => playRange(sg.s, sg.e);
     el.querySelector('#lk-here').onclick = () => { closeSheet(); if (cur.mode === 'read') setMode('listen'); seekToWord(i); };
     el.querySelector('#lk-trs').onclick = () => translateSentence(el);
@@ -1306,8 +1324,11 @@ async function saveWord(el) {
   const b = el.querySelector('#lk-save'); if (b) b.textContent = 'В словаре ✓';
   toast('Сохранено в словарь');
 }
+const AI_CTA = `<div class="ai-cta"><b>Перевод по смыслу — через ИИ</b><span>Подключите бесплатный Gemini: ключ выдают за минуту, перевод и пояснения появятся прямо здесь.</span><button class="btn primary" data-cta>Подключить Gemini</button></div>`;
+function bindCta(root) { root.querySelectorAll('[data-cta]').forEach(b => b.onclick = () => keySheet('gemini')); }
 async function translateSentence(el) {
   const box = el.querySelector('#lk-str'); if (!box || !look) return;
+  if (!aiKey()) { box.hidden = false; box.innerHTML = AI_CTA; bindCta(box); return; }
   box.hidden = false; box.textContent = 'Перевожу…';
   const r = await explainSentence(look.sentence);
   if (!el.isConnected) return;

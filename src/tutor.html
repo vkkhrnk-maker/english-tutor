@@ -278,6 +278,18 @@ input[type=range]:active::-webkit-slider-thumb{transform:scale(1.25)}
 .tabs .cnt{font-size:12px;min-width:20px;height:20px;padding:0 6px;border-radius:10px;background:var(--surface-2);display:inline-grid;place-items:center}
 .tabs .cnt.due{background:var(--accent);color:var(--accent-fg)}
 .book .meta2{font-size:12px;color:var(--fg-3)}
+header.top .add-ic{order:2;width:40px;height:40px}
+header.top .seg{order:3}
+header.top .brand{order:1}
+header.top .tabs{order:4}
+.lk-links{display:flex;gap:16px;flex-wrap:wrap;margin-top:10px;font-size:14px}
+.lk-links .lnk{text-decoration:none;font-weight:600}
+.stat{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:8px 0 4px}
+.stat>div{background:var(--surface);border-radius:var(--r-m);padding:12px 14px;display:grid;gap:2px}
+.stat b{font-size:22px;color:var(--accent)}
+.stat span{font-size:12px;color:var(--fg-2);line-height:1.3}
+.opt small,.toggle small{display:block;font-size:12px;font-weight:400;color:var(--fg-2);margin-top:2px}
+.opt>span:first-child{text-align:left}
 
 /* reader */
 .reader{position:fixed;inset:0;z-index:30;background:var(--bg);display:flex;flex-direction:column;padding-top:env(safe-area-inset-top,0px);transform:translateY(100%);transition:transform .32s cubic-bezier(.2,.8,.2,1);visibility:hidden}
@@ -398,7 +410,7 @@ button.pill{cursor:pointer}
     <button data-th="dark" aria-label="Тёмная тема"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg></button>
     <button data-th="auto" aria-label="Как в системе"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 1 0 18z" fill="currentColor"/></svg></button>
   </div>
-  <button class="btn primary" id="add-btn"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>Книга</button>
+  <button class="ibtn acc add-ic" id="add-btn" aria-label="Добавить книгу"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button>
   <div class="tabs" role="tablist" style="flex-basis:100%">
     <button role="tab" data-tab="books" aria-selected="true">Книги</button>
     <button role="tab" data-tab="vocab" aria-selected="false">Словарь <span class="cnt num" id="cnt-v">0</span></button>
@@ -787,10 +799,9 @@ function render() {
       return `<button class="book" data-open="${b.id}"><div class="cov">${coverHTML(b)}</div>
         ${p > 0 ? `<div class="pbar"><i style="width:${(p * 100).toFixed(1)}%"></i></div>` : ''}
         <div><b>${esc(b.title)}</b><small class="num">${b.parts.length} ${plural(b.parts.length, 'часть', 'части', 'частей')} · ${human(bookTotal(b))}</small>
-        <small class="meta2">${trN === b.parts.length ? 'Текст есть для всех частей' : `Текст есть для ${trN} из ${b.parts.length}`}</small></div></button>`;
-    }).join('') + `<button class="add-tile" id="g-add"><div>${I.plus}Добавить книгу</div></button></div>`;
+        ${trN < b.parts.length ? `<small class="meta2">Без текста: ${b.parts.length - trN} из ${b.parts.length}</small>` : ''}</div></button>`;
+    }).join('') + `</div>`;
   $$('[data-open]').forEach(el => el.onclick = () => openBook(books.find(x => x.id === el.dataset.open)));
-  $('#g-add').onclick = () => $('#add-btn').click();
 }
 
 /* ---------- playback ---------- */
@@ -902,7 +913,7 @@ function openReader() {
   R.innerHTML = `<div class="wrap rd-top"><button class="ibtn" id="r-close" aria-label="Свернуть">${I.down}</button>
       <div class="rd-title"><b id="r-book"></b><small id="r-part"></small></div>
       <button class="ibtn" id="r-nav" aria-label="Части, главы и поиск">${I.list}</button><button class="ibtn" id="r-more" aria-label="Ещё">${I.more}</button></div>
-    <div class="rd-comp" id="r-comp"><div class="seg mode-seg" role="group" aria-label="Режим"><button data-mode="listen">Слушать</button><button data-mode="read">Читать</button></div><span class="rd-pills" id="r-pills"></span></div>
+    <div class="rd-comp" id="r-comp"><div class="seg mode-seg" role="group" aria-label="Режим"><button data-mode="listen">Слушать</button><button data-mode="read">Читать</button></div></div>
     <div class="tx" id="tx"><div class="tx-in" id="tx-in"></div></div>
     <div class="follow-wrap"><button class="btn ghost" id="r-follow" hidden>К текущему месту</button></div>
     <div class="rd-bottom"><div class="wrap readbar" id="r-readbar" hidden><button class="btn primary" id="r-listen-here">Слушать с этого места</button></div><div class="wrap" id="r-player">
@@ -914,8 +925,8 @@ function openReader() {
         <button class="ibtn acc big" id="r-play" aria-label="Слушать"></button>
         <button class="ibtn" id="r-next" aria-label="Следующая фраза">${I.next}</button>
         <button class="chip" id="r-speed"></button>
+        <button class="chip on" id="r-shadow-t" hidden aria-label="Тень включена. Выключить">Тень</button>
       </div>
-      <div class="rd-chips"><button class="chip" id="r-shadow-t">Тень: пауза после фразы</button><button class="chip" id="r-dict">Диктант</button></div>
     </div></div>`;
   R.classList.add('open'); document.body.style.overflow = 'hidden';
   history.pushState?.({ r: 1 }, '');
@@ -925,8 +936,7 @@ function openReader() {
   $('#r-next').onclick = () => sentenceStep(1);
   $('#r-again').onclick = replaySentence;
   $('#r-speed').onclick = speedSheet;
-  $('#r-shadow-t').onclick = () => { shadow = !shadow; lsSet('et-shadow', shadow ? '1' : '0'); shadowPaused = -1; renderChips(); toast(shadow ? 'Тень включена: пауза в конце каждой фразы' : 'Тень выключена'); };
-  $('#r-dict').onclick = dictationSheet;
+  $('#r-shadow-t').onclick = () => toggleShadow();
   $('#sh-again').onclick = () => { shadowPaused = -1; replaySentence(); };
   $('#sh-next').onclick = () => { showShadowBar(false); audio.play().catch(() => {}); };
   $('#r-nav').onclick = navSheet;
@@ -1021,11 +1031,12 @@ function paint() {
     if (st === 'learning') w.el.classList.add('learning');
     else if (st === 'new' && freqRank.size && level !== 'off') w.el.classList.add('new');
   }
-  const c = $('#r-pills');
-  if (c) {
-    c.innerHTML = freqRank.size && total ? `<span class="pill acc num">Понятно ≈${Math.round(k / total * 100)}%</span><button class="pill num" id="r-new">${level === 'off' ? 'Подчёркивание выключено' : `${fresh.size} ${plural(fresh.size, 'редкое слово', 'редких слова', 'редких слов')}`} ⓘ</button>` : '';
-    c.querySelector('#r-new')?.addEventListener('click', levelSheet);
-  }
+  partStats = freqRank.size && total ? { pct: Math.round(k / total * 100), rare: fresh.size } : null;
+}
+let partStats = null;
+function toggleShadow() {
+  shadow = !shadow; lsSet('et-shadow', shadow ? '1' : '0'); shadowPaused = -1; showShadowBar(false); renderChips();
+  toast(shadow ? 'Тень включена: пауза после каждой фразы, чтобы повторить вслух' : 'Тень выключена');
 }
 function levelSheet() {
   const opt = (k, title, sub) => `<button class="opt ${level === k ? 'sel' : ''}" data-l="${k}"><span>${title}</span><span>${sub}</span></button>`;
@@ -1066,7 +1077,7 @@ function showShadowBar(on) { const b = $('#r-shadow'); if (b) b.hidden = !on; }
 function playIcon() { const b = $('#r-play'); if (b) { b.innerHTML = (audio.paused ? I.play : I.pause).replace('width="24" height="24"', 'width="30" height="30"'); b.setAttribute('aria-label', audio.paused ? 'Слушать' : 'Пауза'); } }
 function renderChips() {
   const s = $('#r-speed'); if (s) s.textContent = String(cur?.speed || 1).replace('.', ',') + '×';
-  const sh = $('#r-shadow-t'); if (sh) sh.classList.toggle('on', shadow);
+  const sh = $('#r-shadow-t'); if (sh) sh.hidden = !shadow;
 }
 function updateSeek() {
   const s = $('#r-seek'); if (!s || seeking) return;
@@ -1108,15 +1119,27 @@ function jumpToSeg(si) {
 function moreSheet() {
   const b = cur;
   openSheet(`<h3>${esc(b.title)}</h3>
+    ${partStats ? `<div class="stat"><div><b class="num">≈${partStats.pct}%</b><span>слов этой части вы, скорее всего, знаете</span></div><div><b class="num">${partStats.rare}</b><span>${plural(partStats.rare, 'редкое слово', 'редких слова', 'редких слов')} в ней</span></div></div>` : ''}
+    <div class="sh-sub">Тренировка</div>
+    <div class="opts">
+      <button class="toggle" role="switch" aria-checked="${shadow}" id="m-shadow"><span>Тень<small>пауза после каждой фразы, чтобы повторить вслух</small></span><i></i></button>
+      <button class="opt" data-a="dict"><span>Диктант<small>слушаете фразу и записываете её</small></span><span>›</span></button>
+    </div>
+    <div class="sh-sub">Текст</div>
     <div class="opts">
       <button class="opt" data-a="lvl">Подчёркивание: ${({ less: 'меньше', more: 'больше', off: 'выключено' })[level]} <span>›</span></button>
       <button class="opt" data-a="ai">ИИ для разбора слов: ${aiLabel()} <span>›</span></button>
+    </div>
+    <div class="sh-sub">Книга</div>
+    <div class="opts">
       <button class="opt" data-a="tr">Добавить расшифровки (.json) <span>›</span></button>
       <button class="opt" data-a="cover">Сменить обложку <span>›</span></button>
       <button class="opt" data-a="edit">Изменить название <span>›</span></button>
       <button class="opt dz" data-a="del">Удалить книгу с телефона</button>
     </div>`, el => {
     el.querySelector('[data-a=lvl]').onclick = levelSheet;
+    el.querySelector('#m-shadow').onclick = e => { toggleShadow(); e.currentTarget.setAttribute('aria-checked', shadow); };
+    el.querySelector('[data-a=dict]').onclick = dictationSheet;
     el.querySelector('[data-a=ai]').onclick = () => keySheet();
     el.querySelector('[data-a=tr]').onclick = () => { closeSheet(); pendingAttach = b; $('#f-files').click(); };
     el.querySelector('[data-a=cover]').onclick = () => { closeSheet(); pickCover(b); };
@@ -1164,7 +1187,7 @@ async function lookupWord(i) {
     <div class="lk-meta" id="lk-meta"></div>
     <div id="lk-body"><span class="skel" style="width:55%;height:24px;margin-top:16px"></span><span class="skel" style="width:90%;margin-top:12px"></span><span class="skel" style="width:75%"></span><span class="skel" style="width:60%;margin-top:12px"></span></div>
     <div class="lk-sent">${marked}<div class="lk-sent-tr" id="lk-str" hidden></div></div>
-    <div class="lk-acts"><button class="btn ghost" id="lk-ph">Прослушать фразу</button><button class="btn ghost" id="lk-here">Слушать отсюда</button><button class="btn ghost" id="lk-trs">Перевести фразу</button></div>
+    <div class="lk-links"><button class="lnk" id="lk-ph">Прослушать фразу</button><button class="lnk" id="lk-trs">Перевести</button><button class="lnk" id="lk-here">Слушать отсюда</button></div>
     <div class="lk-main"><button class="btn ghost" id="lk-known">Уже знаю</button><button class="btn primary" id="lk-save">${inVocab ? 'В словаре ✓' : 'В словарь'}</button></div>`, el => {
     el.querySelector('#lk-say').onclick = () => speak(word);
     el.querySelector('#lk-ph').onclick = () => playRange(sg.s, sg.e);
@@ -1333,7 +1356,7 @@ function renderVocab() {
   const list = $('#v-list');
   const draw = q => {
     const items = vocab.filter(v => !q || v.word.toLowerCase().includes(q) || (v.translation_ru || '').toLowerCase().includes(q));
-    list.innerHTML = items.map(v => `<button class="vitem" data-id="${v.id}"><b>${esc(v.word)}</b><span class="box num">${(v.box || 0) >= 3 ? 'выучено' : 'ур. ' + (v.box || 0)}</span><span class="tr">${esc(v.translation_ru || v.meaning_en || '')}</span></button>`).join('') || '<div class="done-box">Ничего не нашлось</div>';
+    list.innerHTML = items.map(v => `<button class="vitem" data-id="${v.id}"><b>${esc(v.word)}</b><span class="box">${(v.box || 0) >= 3 ? 'выучено' : (v.box || 0) > 0 ? 'учу' : 'новое'}</span><span class="tr">${esc(v.translation_ru || v.meaning_en || '')}</span></button>`).join('') || '<div class="done-box">Ничего не нашлось</div>';
     list.querySelectorAll('[data-id]').forEach(b => b.onclick = () => vocabSheet(vocab.find(v => v.id === b.dataset.id)));
   };
   draw('');
@@ -1437,7 +1460,7 @@ function renderMini() {
   document.body.classList.toggle('has-mini', !!cur);
   if (!show) { el.hidden = true; return; }
   el.hidden = false;
-  el.innerHTML = `<div class="in"><div class="row"><button class="open" id="m-open"><div class="cov">${coverHTML(cur)}</div><div class="t"><b>${esc(cur.title)}</b><small>Часть ${cur.pos.part + 1} · ${esc(cur.parts[cur.pos.part]?.name || '')}</small></div></button>
+  el.innerHTML = `<div class="in"><div class="row"><button class="open" id="m-open"><div class="cov">${coverHTML(cur)}</div><div class="t"><b>${esc(cur.title)}</b><small>${cur.parts.length > 1 ? `Часть ${cur.pos.part + 1} из ${cur.parts.length}` : (cur.author ? esc(cur.author) : 'Аудиокнига')}</small></div></button>
     <button class="ibtn acc" id="m-play" aria-label="${audio.paused ? 'Слушать' : 'Пауза'}">${audio.paused ? I.play : I.pause}</button></div></div>`;
   $('#m-open').onclick = () => openBook(cur);
   $('#m-play').onclick = toggle;

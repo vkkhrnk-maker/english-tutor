@@ -1,5 +1,5 @@
 // Офлайн-кэш оболочки приложения. Сами книги лежат в IndexedDB и через этот файл не проходят.
-const VERSION = 'cd767c36cf';
+const VERSION = '9dbba9da93';
 const CACHE = `entutor-${VERSION}`;
 const SHELL = ['./', 'index.html', 'manifest.webmanifest', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/apple-touch-icon.png', 'en-frequency.txt'];
 
@@ -23,7 +23,7 @@ self.addEventListener('fetch', e => {
   // страница: сначала сеть, чтобы обновления приходили сразу; без сети — из кэша
   if (req.mode === 'navigate') {
     e.respondWith(
-      fetch(req)
+      fetch(req, { cache: 'no-cache' })   // мимо HTTP-кэша: GitHub Pages разрешает держать страницу 10 минут
         .then(res => { const copy = res.clone(); caches.open(CACHE).then(c => c.put('index.html', copy)); return res; })
         .catch(() => caches.match('index.html'))
     );
@@ -35,7 +35,7 @@ self.addEventListener('fetch', e => {
   if (url.origin === location.origin || isFont) {
     e.respondWith(
       caches.match(req).then(hit => {
-        const net = fetch(req).then(res => {
+        const net = fetch(req, isFont ? {} : { cache: 'no-cache' }).then(res => {
           if (res.ok || res.type === 'opaque') { const copy = res.clone(); caches.open(CACHE).then(c => c.put(req, copy)); }
           return res;
         }).catch(() => hit);

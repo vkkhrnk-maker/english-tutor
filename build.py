@@ -49,7 +49,19 @@ TAIL = """
   matchMedia('(prefers-color-scheme: dark)').addEventListener?.('change', sync);
   sync();
 })();
-if ('serviceWorker' in navigator) addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
+// обновления: проверяем при запуске и при возврате в приложение; новая версия включается сама, если ничего не играет
+if ('serviceWorker' in navigator) addEventListener('load', async () => {
+  let reg;
+  try { reg = await navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }); } catch { return; }
+  const hadController = !!navigator.serviceWorker.controller;
+  const playing = () => [...document.querySelectorAll('audio')].some(a => !a.paused);
+  let pending = false;
+  const apply = () => { if (playing()) { pending = true; return; } location.reload(); };
+  navigator.serviceWorker.addEventListener('controllerchange', () => { if (hadController) apply(); });
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') reg.update().catch(() => {}); });
+  document.addEventListener('pause', () => { if (pending) apply(); }, true);
+  reg.update().catch(() => {});
+});
 </script>
 </body>
 </html>

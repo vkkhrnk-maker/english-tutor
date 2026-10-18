@@ -1,0 +1,26 @@
+{
+ "magi": {
+  "file": "FourMillion16.png",
+  "artist": "O. Henry",
+  "license": "Public domain",
+  "url": "https://commons.wikimedia.org/wiki/File:FourMillion16.png"
+ },
+ "wilde": {
+  "file": "Plate 1 of The Happy Prince and Other Tales (1888).png",
+  "artist": "Crane, Walter, 1845-1915",
+  "license": "Public domain",
+  "url": "https://commons.wikimedia.org/wiki/File:Plate_1_of_The_Happy_Prince_and_Other_Tales_(1888).png"
+ },
+ "alice": {
+  "file": "Alice-white-rabbit.jpg",
+  "artist": "Sir John Tenniel",
+  "license": "Public domain",
+  "url": "https://commons.wikimedia.org/wiki/File:Alice-white-rabbit.jpg"
+ },
+ "holmes": {
+  "file": "A Scandal in Bohemia.jpg",
+  "artist": "Sidney Paget (1860 - 1908)",
+  "license": "Public domain",
+  "url": "https://commons.wikimedia.org/wiki/File:A_Scandal_in_Bohemia.jpg"
+ }
+}

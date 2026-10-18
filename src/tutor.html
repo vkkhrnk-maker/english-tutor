@@ -311,6 +311,9 @@ input[type=range]:active::-webkit-slider-thumb{transform:scale(1.25)}
 header.top .wrap{flex-wrap:nowrap;padding-block:12px}
 .page-t{margin:0 auto 0 0;font-size:28px;font-weight:700;letter-spacing:-.02em}
 header.top .add-ic{width:40px;height:40px}
+header.top .set-ic{width:40px;height:40px;background:var(--surface)}
+header.top .set-ic:hover{background:var(--surface-2)}
+header.top .set-ic svg{width:20px;height:20px}
 .page-sub{margin:4px 0 12px;font-size:13px;color:var(--fg-2)}
 .set-seg{width:100%}
 .set-seg button{flex:1;justify-content:center;height:36px}
@@ -462,7 +465,7 @@ button.pill{cursor:pointer}
 
 <header class="top"><div class="wrap">
   <h1 class="page-t" id="page-t">Книги</h1>
-  <button class="ibtn" id="set-btn" aria-label="Настройки"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></button>
+  <button class="ibtn set-ic" id="set-btn" aria-label="Настройки"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></button>
   <button class="ibtn acc add-ic" id="add-btn" aria-label="Добавить книгу"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button>
 </div></header>
 
@@ -859,7 +862,7 @@ async function resumeLibrary(b, c) {
 }
 function libraryHTML() {
   if (!catalog.length) return '';
-  return `<div class="section-h"><h2>Библиотека</h2><span>бесплатно · LibriVox</span></div><div class="lib-row">` + catalog.map(c => {
+  return `<div class="section-h"><h2>Библиотека</h2></div><div class="lib-row">` + catalog.map(c => {
     const have = books.some(b => b.libId === c.id);
     return `<button class="lib-card" data-lib="${c.id}"><img src="${c.cover}" alt="" loading="lazy"><b>${esc(c.title)}</b><small>${esc(c.author)}</small><span class="lib-meta num">${esc(c.level)} · ${human(libDur(c))}${have ? ' · на телефоне' : ''}</span></button>`;
   }).join('') + `</div>`;

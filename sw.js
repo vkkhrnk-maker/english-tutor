@@ -1,7 +1,7 @@
 // Офлайн-кэш оболочки приложения. Сами книги лежат в IndexedDB и через этот файл не проходят.
-const VERSION = 'c1e12e3599';
+const VERSION = 'b790f313bb';
 const CACHE = `entutor-${VERSION}`;
-const SHELL = ['./', 'index.html', 'manifest.webmanifest', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/apple-touch-icon.png', 'en-frequency.txt'];
+const SHELL = ['./', 'index.html', 'manifest.webmanifest', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/apple-touch-icon.png', 'en-frequency.txt', 'vendor/ts-fsrs.mjs'];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL)).then(() => self.skipWaiting()));

@@ -32,3 +32,5 @@
 Обложки: иллюстрации из общественного достояния с Wikimedia Commons — [O. Henry](https://commons.wikimedia.org/wiki/File:FourMillion16.png); [Crane, Walter, 1845-1915](https://commons.wikimedia.org/wiki/File:Plate_1_of_The_Happy_Prince_and_Other_Tales_(1888).png); [Sir John Tenniel](https://commons.wikimedia.org/wiki/File:Alice-white-rabbit.jpg); [Sidney Paget (1860 - 1908)](https://commons.wikimedia.org/wiki/File:A_Scandal_in_Bohemia.jpg).
 
 Ссылка `#demo` сразу добавляет и открывает «A Scandal in Bohemia».
+
+`vendor/ts-fsrs.mjs` — [ts-fsrs](https://github.com/open-spaced-repetition/ts-fsrs) 5.4.2 (MIT), алгоритм интервального повторения FSRS.

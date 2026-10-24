@@ -459,6 +459,22 @@ button.pill{cursor:pointer}
 .card-acts{max-width:520px;margin:12px auto 0;display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
 .card-acts .btn{justify-content:center;height:52px}
 .card-acts.one{grid-template-columns:1fr}
+.card{grid-template-columns:minmax(0,1fr)}
+.card .prog{white-space:normal;line-height:1.35}
+.card-ask{min-width:0}
+.card-acts.four{grid-template-columns:repeat(4,1fr);gap:6px}
+.card-acts.four .btn{height:60px;flex-direction:column;gap:2px;padding:0 4px;font-size:13px;line-height:1.1}
+.card-acts.four small{font-size:11px;font-weight:500;opacity:.75}
+.g0{background:var(--surface);color:var(--danger)}.g1{background:var(--surface)}.g2{background:var(--accent);color:var(--accent-fg)}.g3{background:var(--surface);color:var(--accent)}
+.card-acts .sugg{outline:2px solid var(--accent);outline-offset:2px}
+.card .sent.big{font-size:19px;color:var(--fg);line-height:1.5}
+.blank{display:inline-block;min-width:70px;border-bottom:2px solid var(--accent);color:transparent}
+.card-ask{margin-top:4px}
+.card-ask input{height:46px;font-size:17px;text-align:center}
+.card .lnk{justify-self:center;font-size:13px}
+.listen-btn{justify-self:center}
+.fb{font-weight:700;font-size:15px}.fb.ok{color:var(--accent)}.fb.almost{color:#c88a00}.fb.no{color:var(--fg-2);font-weight:500}
+.cf-row{display:flex;gap:8px}.cf-row input{flex:1;min-width:0}.cf-row .btn{height:48px}
 .g-again{background:var(--surface);color:var(--danger)}
 .g-hard{background:var(--surface)}
 .g-good{background:var(--accent);color:var(--accent-fg)}
@@ -516,7 +532,6 @@ const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAl
 const audio = $('#audio');
 const AUDIO_RE = /\.(mp3|m4a|m4b|aac|ogg|oga|opus|flac|wav)$/i;
 const SPEEDS = [0.6, 0.75, 0.85, 1, 1.15, 1.25, 1.5, 2];
-const INTERVALS = [8 * 60e3, 864e5, 3 * 864e5, 7 * 864e5, 16 * 864e5, 35 * 864e5];
 const LEVELS = { more: 5000, less: 12000, off: 0 };   // how many top-frequency words count as known
 
 const I = {
@@ -911,7 +926,7 @@ async function attachTranscripts(b, files) {
 $('#f-files').onchange = e => { const fs = [...e.target.files]; e.target.value = ''; if (!fs.length) return; const t = pendingAttach; pendingAttach = null; t ? attachTranscripts(t, fs) : importFiles(fs, ''); };
 $('#f-dir').onchange = e => { const fs = [...e.target.files]; e.target.value = ''; if (fs.length) importFiles(fs, (fs[0].webkitRelativePath || '').split('/')[0]); };
 let pendingAttach = null;
-$('#add-btn').onclick = () => openSheet(`<h3>Добавить книгу</h3>
+$('#add-btn').onclick = () => curTab === 'vocab' ? cardForm() : openSheet(`<h3>Добавить книгу</h3>
   <p>Выберите сразу все MP3-части книги и файлы расшифровки .json. Расшифровка подхватится к части с тем же именем.</p>
   <div class="opts"><button class="opt" data-a="files">Выбрать файлы <span>›</span></button><button class="opt" data-a="dir">Выбрать папку (на компьютере) <span>›</span></button></div>`, el => {
   el.querySelector('[data-a=files]').onclick = () => { closeSheet(); $('#f-files').click(); };
@@ -926,7 +941,6 @@ addEventListener('drop', e => { e.preventDefault(); dragDepth = 0; document.body
 /* ---------- library + tabs ---------- */
 $$('.tabbar [data-tab]').forEach(b => b.onclick = () => { if (curTab === b.dataset.tab) { scrollTo({ top: 0, behavior: 'smooth' }); return; } curTab = b.dataset.tab; scrollTo(0, 0); render(); });
 $('#set-btn').onclick = () => settingsSheet();
-function dueCards() { const now = Date.now(); return vocab.filter(v => (v.due || 0) <= now); }
 function counters() {
   const d = dueCards().length, bd = $('#cnt-c'); if (bd) { bd.textContent = d > 99 ? '99+' : d; bd.hidden = !d; }
 }
@@ -935,7 +949,8 @@ const bookDone = b => b.parts.slice(0, b.pos.part).reduce((s, p) => s + (p.durat
 function render() {
   $$('.tabbar [data-tab]').forEach(b => b.setAttribute('aria-selected', b.dataset.tab === curTab));
   $('#page-t').textContent = ({ books: 'Книги', vocab: 'Словарь', cards: 'Карточки' })[curTab];
-  $('#add-btn').hidden = curTab !== 'books';
+  $('#add-btn').hidden = curTab === 'cards';
+  $('#add-btn').setAttribute('aria-label', curTab === 'vocab' ? 'Добавить слово' : 'Добавить книгу');
   counters();
   if (curTab === 'vocab') return renderVocab();
   if (curTab === 'cards') return renderCards();
@@ -1671,7 +1686,7 @@ function keySheet(pv = aiProvider()) {
 /* ---------- vocabulary ---------- */
 function renderVocab() {
   const m = $('#main');
-  if (!vocab.length) { m.innerHTML = `<div class="done-box"><b>Словарь пока пуст</b>Тапните по слову в тексте книги и нажмите «В словарь». Здесь появятся слова с переводом и фразой, где они встретились.</div>`; return; }
+  if (!vocab.length) { m.innerHTML = `<div class="done-box"><b>Словарь пока пуст</b>Тапните по слову в тексте книги и нажмите «В словарь», или добавьте своё слово.<button class="btn primary" id="v-new" style="margin-top:8px">Добавить слово</button></div>`; $('#v-new').onclick = () => cardForm(); return; }
   m.innerHTML = `<p class="page-sub num">${vocab.length} ${plural(vocab.length, 'слово', 'слова', 'слов')}</p>
     <input class="vsearch" id="v-q" placeholder="Найти слово или перевод" autocomplete="off" aria-label="Поиск по словарю">
     <div class="vtools"><button class="btn ghost" id="v-copy">Скопировать списком</button></div>
@@ -1679,7 +1694,7 @@ function renderVocab() {
   const list = $('#v-list');
   const draw = q => {
     const items = vocab.filter(v => !q || v.word.toLowerCase().includes(q) || (v.translation_ru || '').toLowerCase().includes(q));
-    list.innerHTML = items.map(v => `<button class="vitem" data-id="${v.id}"><b>${esc(v.word)}</b><span class="box">${(v.box || 0) >= 3 ? 'выучено' : (v.box || 0) > 0 ? 'учу' : 'новое'}</span><span class="tr">${esc(v.translation_ru || v.meaning_en || '')}</span></button>`).join('') || '<div class="done-box">Ничего не нашлось</div>';
+    list.innerHTML = items.map(v => `<button class="vitem" data-id="${v.id}"><b>${esc(v.word)}</b><span class="box">${stageOf(v)}</span><span class="tr">${esc(v.translation_ru || v.meaning_en || '')}</span></button>`).join('') || '<div class="done-box">Ничего не нашлось</div>';
     list.querySelectorAll('[data-id]').forEach(b => b.onclick = () => vocabSheet(vocab.find(v => v.id === b.dataset.id)));
   };
   draw('');
@@ -1698,7 +1713,9 @@ function vocabSheet(v) {
     <div class="lk-tr">${esc(v.translation_ru || '—')}</div>
     ${v.meaning_en ? `<div class="lk-mean">${esc(v.meaning_en)}</div>` : ''}${v.example ? `<div class="lk-ex">${esc(v.example)}</div>` : ''}${v.note ? `<div class="lk-note">${esc(v.note)}</div>` : ''}
     ${v.sentence ? `<div class="lk-sent">${marked}</div>` : ''}
-    <div class="lk-acts">${v.partKey ? '<button class="btn ghost" id="vs-ph">Фраза из книги</button>' : ''}<button class="btn ghost dz" id="vs-del">Удалить из словаря</button></div>`, el => {
+    <div class="lk-meta" style="margin-top:12px">${esc(stageOf(v))}${v.fsrs && v.due ? ` · следующее повторение ${new Date(v.due).toLocaleDateString('ru', { day: 'numeric', month: 'long' })}` : ''}</div>
+    <div class="lk-acts">${v.partKey ? '<button class="btn ghost" id="vs-ph">Фраза из книги</button>' : ''}<button class="btn ghost" id="vs-edit">Изменить</button><button class="btn ghost dz" id="vs-del">Удалить</button></div>`, el => {
+    el.querySelector('#vs-edit').onclick = () => cardForm(v);
     el.querySelector('#vs-say').onclick = () => { if (!playClip(v.partKey, v.wordStart, v.wordEnd)) speak(v.word); };
     el.querySelector('#vs-ph')?.addEventListener('click', () => playClip(v.partKey, v.sentStart ?? v.wordStart - 2, v.sentEnd ?? v.wordEnd + 2));
     const del = el.querySelector('#vs-del');
@@ -1706,37 +1723,165 @@ function vocabSheet(v) {
   });
 }
 
-/* ---------- flashcards (Leitner) ---------- */
+/* ---------- own cards ---------- */
+function cardForm(v) {
+  const isNew = !v;
+  openSheet(`<h3>${isNew ? 'Новое слово' : 'Изменить карточку'}</h3>
+    <div class="field"><label for="cf-w">Слово или фраза по-английски</label><input id="cf-w" value="${esc(v?.word || '')}" autocapitalize="off" autocomplete="off" spellcheck="false" placeholder="например, break out"></div>
+    <div class="field"><label for="cf-t">Перевод</label><div class="cf-row"><input id="cf-t" value="${esc(v?.translation_ru || '')}" placeholder="вспыхнуть, начаться"><button class="btn ghost" id="cf-auto" type="button">Подсказать</button></div></div>
+    <div class="field"><label for="cf-e">Пример по-английски (необязательно)</label><textarea class="dict-in" id="cf-e" rows="2" placeholder="An argument had broken out over breakfast.">${esc(v?.sentence || v?.example || '')}</textarea></div>
+    <div class="field"><label for="cf-n">Заметка (необязательно)</label><input id="cf-n" value="${esc(v?.note || '')}"></div>
+    <div class="acts">${isNew ? '<button class="btn ghost" id="cf-no">Отмена</button>' : ''}<button class="btn primary" id="cf-ok">Сохранить</button></div>`, el => {
+    const $f = x => el.querySelector(x);
+    $f('#cf-no')?.addEventListener('click', () => closeSheet());
+    $f('#cf-auto').onclick = async () => {
+      const w = $f('#cf-w').value.trim(); if (!w) { toast('Сначала впишите слово'); return; }
+      const b = $f('#cf-auto'); b.disabled = true; b.textContent = '…';
+      const ex = $f('#cf-e').value.trim();
+      const d = await explainWord(w, ex || w, w.includes(' '));
+      b.disabled = false; b.textContent = 'Подсказать';
+      if (d.error) { toast(d.error); return; }
+      if (d.translation_ru) $f('#cf-t').value = d.translation_ru;
+      if (!$f('#cf-e').value.trim() && d.example) $f('#cf-e').value = d.example;
+      if (!$f('#cf-n').value.trim() && d.note) $f('#cf-n').value = d.note;
+      el._extra = { pos: d.pos || '', lemma: d.lemma || '', meaning_en: d.meaning_en || '' };
+    };
+    $f('#cf-ok').onclick = async () => {
+      const word = $f('#cf-w').value.trim();
+      if (!word) { toast('Впишите слово'); return; }
+      const fields = { word, translation_ru: $f('#cf-t').value.trim(), sentence: $f('#cf-e').value.trim(), note: $f('#cf-n').value.trim(), ...(el._extra || {}) };
+      if (isNew) {
+        if (vocab.some(x => x.word.toLowerCase() === word.toLowerCase())) { toast('Это слово уже в словаре'); return; }
+        vocab.unshift({ id: 'w' + Date.now().toString(36), lemma: word, pos: '', meaning_en: '', example: '', ...fields, manual: true, added: Date.now(), due: Date.now(), reps: 0 });
+      } else Object.assign(v, fields);
+      await saveVocab(); closeSheet(); paint(); render(); toast(isNew ? 'Слово добавлено' : 'Сохранено');
+    };
+  });
+}
+
+/* ---------- flashcards: FSRS scheduling, four task types ---------- */
+let fsrsLib = null, fsrsInst = null;
+async function fsrsReady() {
+  if (fsrsInst) return true;
+  try { fsrsLib = await import('./vendor/ts-fsrs.mjs'); fsrsInst = fsrsLib.fsrs(fsrsLib.generatorParameters({ enable_fuzz: true })); return true; }
+  catch { return false; }
+}
+const RATING = () => [fsrsLib.Rating.Again, fsrsLib.Rating.Hard, fsrsLib.Rating.Good, fsrsLib.Rating.Easy];
+function cardOf(v) {
+  if (!v.fsrs) { const c = fsrsLib.createEmptyCard(new Date(v.added || Date.now())); c.due = new Date(v.due || Date.now()); v.fsrs = c; }
+  return v.fsrs;
+}
+function stageOf(v) {
+  if (!v.fsrs || !v.fsrs.reps) return 'новое';
+  return (v.fsrs.stability || 0) >= 21 ? 'выучено' : 'учу';
+}
+function fmtIvl(ms) {
+  const m = ms / 60000;
+  if (m < 60) return `${Math.max(1, Math.round(m))} мин`;
+  if (m < 1440) return `${Math.round(m / 60)} ч`;
+  const d = m / 1440;
+  if (d < 31) return `${Math.round(d)} ${plural(Math.round(d), 'день', 'дня', 'дней')}`;
+  const mo = Math.round(d / 30); return `${mo} мес.`;
+}
+const newPerDay = () => +lsGet('et-newday') || 20;
+const newTodayKey = () => 'et-new-' + dayKey();
+function cardQueue() {
+  const now = Date.now(), due = vocab.filter(v => (v.due || 0) <= now);
+  const fresh = due.filter(v => !v.fsrs || !v.fsrs.reps), old = due.filter(v => v.fsrs && v.fsrs.reps);
+  const room = Math.max(0, newPerDay() - (+lsGet(newTodayKey()) || 0));
+  return [...old.sort((a, b) => (a.due || 0) - (b.due || 0)), ...fresh.slice(0, room)];
+}
+function dueCards() { return cardQueue(); }
+const hasWordIn = (v, text) => !!text && new RegExp(`\\b${v.word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i').test(text);
+function taskTypes(v) {
+  const t = ['rec'];
+  if (v.partKey && v.sentStart != null && hasWordIn(v, v.sentence)) t.push('listen');
+  if (hasWordIn(v, v.sentence)) t.push('cloze');
+  if (v.translation_ru) t.push('recall');
+  return t;
+}
+function pickTask(v) {
+  const t = taskTypes(v), reps = v.fsrs?.reps || 0;
+  if (!reps) return 'rec';
+  return t[reps % t.length];
+}
+const normAns = x => String(x || '').toLowerCase().replace(/[‘’ʼ]/g, "'").replace(/[^a-z' -]/g, '').replace(/\s+/g, ' ').trim();
+function editDist(a, b) {
+  const d = Array.from({ length: a.length + 1 }, (_, i) => [i, ...Array(b.length).fill(0)]);
+  for (let j = 1; j <= b.length; j++) d[0][j] = j;
+  for (let i = 1; i <= a.length; i++) for (let j = 1; j <= b.length; j++) d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+  return d[a.length][b.length];
+}
+function blankOut(v) { return esc(v.sentence).replace(new RegExp(`\\b${v.word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i'), '<span class="blank">______</span>'); }
 let session = null;
-function renderCards() {
-  const m = $('#main'), due = dueCards();
-  if (!due.length) {
-    m.innerHTML = `<div class="done-box"><b>${vocab.length ? 'На сейчас всё повторено' : 'Карточек пока нет'}</b>${vocab.length ? 'Слова вернутся по расписанию: через минуты, день, три, неделю и дальше.' : 'Сохраняйте слова из книги, и здесь появятся карточки для повторения.'}</div>`;
+async function renderCards() {
+  const m = $('#main');
+  if (!(await fsrsReady())) { m.innerHTML = `<div class="done-box"><b>Не получилось загрузить карточки</b>Проверьте интернет и откройте вкладку ещё раз.</div>`; return; }
+  const q = cardQueue();
+  counters();
+  if (!q.length) {
+    const next = vocab.map(v => v.due || 0).filter(t => t > Date.now()).sort((a, b) => a - b)[0];
+    m.innerHTML = `<div class="done-box"><b>${vocab.length ? 'На сейчас всё повторено' : 'Карточек пока нет'}</b>${vocab.length ? (next ? `Следующее слово вернётся через ${fmtIvl(next - Date.now())}.` : '') : 'Сохраняйте слова из книги или добавьте свои во вкладке «Словарь».'}</div>`;
     return;
   }
-  if (!session || session.idx >= session.queue.length) session = { queue: due, idx: 0, open: false, total: due.length };
+  if (!session || session.idx >= session.queue.length) session = { queue: q, idx: 0, total: q.length, open: false, task: null, answer: null };
   showCard();
 }
 function showCard() {
   const m = $('#main'), s = session;
   if (!s || s.idx >= s.queue.length) { session = null; return renderCards(); }
   const v = s.queue[s.idx];
+  cardOf(v);
+  if (!s.task) s.task = pickTask(v);
   if (v.partKey) prepClip(v.partKey);
-  m.innerHTML = `<div class="card"><div class="prog num">${s.idx + 1} из ${s.total}</div>
-      <div class="word">${esc(v.word)} <button class="ibtn" id="c-say" aria-label="Произнести">${I.speaker}</button></div>
-      ${s.open ? `<div class="tr">${esc(v.translation_ru || '—')}</div>${v.meaning_en ? `<div class="lk-mean">${esc(v.meaning_en)}</div>` : ''}` : `<div class="lk-meta">${esc(v.pos || '')}</div>`}
-      ${v.sentence ? `<div class="sent">«${esc(v.sentence)}»</div>` : ''}</div>
-    ${s.open ? `<div class="card-acts"><button class="btn g-again" data-g="again">Не помню</button><button class="btn g-hard" data-g="hard">Сложно</button><button class="btn g-good" data-g="good">Помню</button></div>`
-      : `<div class="card-acts one"><button class="btn primary" id="c-open">Показать перевод</button></div>`}`;
-  $('#c-say').onclick = () => { if (!playClip(v.partKey, v.wordStart, v.wordEnd)) speak(v.word); };
+  const playSent = () => { if (!playClip(v.partKey, v.sentStart ?? v.wordStart - 2, v.sentEnd ?? v.wordEnd + 2)) speak(v.sentence || v.word); };
+  const sayWord = () => { if (!playClip(v.partKey, v.wordStart, v.wordEnd)) speak(v.word); };
+  const typed = s.task !== 'rec';
+  const label = { rec: 'Вспомните перевод', recall: 'Как это по-английски?', cloze: 'Какое слово пропущено?', listen: 'Послушайте и впишите пропущенное слово' }[s.task];
+  let front = '';
+  if (s.task === 'rec') front = `<div class="word">${esc(v.word)} <button class="ibtn" id="c-say" aria-label="Произнести">${I.speaker}</button></div>${v.sentence ? `<div class="sent">«${esc(v.sentence)}»</div>` : ''}`;
+  if (s.task === 'recall') front = `<div class="tr">${esc(v.translation_ru)}</div>${v.meaning_en ? `<div class="lk-mean">${esc(v.meaning_en)}</div>` : ''}`;
+  if (s.task === 'cloze') front = `<div class="sent big">«${blankOut(v)}»</div>${v.translation_ru ? `<div class="lk-mean">подсказка: ${esc(v.translation_ru)}</div>` : ''}`;
+  if (s.task === 'listen') front = `<button class="btn ghost listen-btn" id="c-play">${I.speaker} Ещё раз</button><div class="sent big">«${blankOut(v)}»</div>`;
+  let back = '';
+  if (s.open) {
+    const fb = s.answer == null ? '' : s.answer.ok === 'ok' ? '<div class="fb ok">Верно</div>' : s.answer.ok === 'almost' ? `<div class="fb almost">Почти: «${esc(s.answer.text)}»</div>` : `<div class="fb no">${s.answer.text ? `Вы написали «${esc(s.answer.text)}»` : 'Ничего страшного'}</div>`;
+    back = `${fb}${s.task !== 'rec' ? `<div class="word">${esc(v.word)} <button class="ibtn" id="c-say" aria-label="Произнести">${I.speaker}</button></div>` : ''}
+      ${s.task !== 'recall' ? `<div class="tr">${esc(v.translation_ru || '—')}</div>` : ''}${v.meaning_en && s.task !== 'recall' ? `<div class="lk-mean">${esc(v.meaning_en)}</div>` : ''}
+      ${s.task !== 'rec' && v.sentence ? `<div class="sent">«${esc(v.sentence)}»</div>` : ''}${v.note ? `<div class="lk-note">${esc(v.note)}</div>` : ''}`;
+  }
+  const rec = s.open ? fsrsInst.repeat(cardOf(v), new Date()) : null;
+  const sugg = s.answer ? ({ ok: 2, almost: 1, no: 0 })[s.answer.ok] : -1;
+  const names = ['Не помню', 'Трудно', 'Помню', 'Легко'];
+  m.innerHTML = `<div class="card"><div class="prog num">${s.idx + 1} из ${s.total} · ${label}</div>${front}${back}
+    ${!s.open && typed ? `<form class="ask card-ask" id="c-form"><input id="c-in" autocapitalize="off" autocomplete="off" spellcheck="false" placeholder="ваш ответ" aria-label="Ваш ответ"><button class="btn primary">Проверить</button></form><button class="lnk" id="c-dunno">Не знаю, показать</button>` : ''}</div>
+    ${s.open ? `<div class="card-acts four">${RATING().map((r, k) => `<button class="btn g${k}${k === sugg ? ' sugg' : ''}" data-r="${k}"><span>${names[k]}</span><small class="num">${fmtIvl(rec[r].card.due - Date.now())}</small></button>`).join('')}</div>`
+      : !typed ? `<div class="card-acts one"><button class="btn primary" id="c-open">Показать перевод</button></div>` : ''}`;
+  $('#c-say')?.addEventListener('click', sayWord);
+  $('#c-play')?.addEventListener('click', playSent);
+  if (s.task === 'listen' && !s.open && !s.played) { s.played = true; setTimeout(playSent, 250); }
   $('#c-open')?.addEventListener('click', () => { s.open = true; showCard(); });
-  $$('[data-g]').forEach(b => b.onclick = async () => {
-    const g = b.dataset.g;
-    if (g === 'again') v.box = 0; else if (g === 'good') v.box = Math.min(5, (v.box || 0) + 1);
-    v.reps = (v.reps || 0) + 1; v.due = Date.now() + INTERVALS[v.box || 0];
-    if ((v.box || 0) >= 3) { known.add(cleanTok(v.word)); saveKnown(); }
+  $('#c-dunno')?.addEventListener('click', () => { s.answer = { ok: 'no', text: '' }; s.open = true; showCard(); });
+  const form = $('#c-form');
+  if (form) { setTimeout(() => $('#c-in')?.focus({ preventScroll: true }), 50); form.onsubmit = e => {
+    e.preventDefault();
+    const a = normAns($('#c-in').value), want = normAns(v.word);
+    if (!a) return;
+    const dist = editDist(a, want);
+    s.answer = { text: $('#c-in').value.trim(), ok: a === want ? 'ok' : (want.length > 3 && dist <= 1) || (want.length > 7 && dist <= 2) ? 'almost' : 'no' };
+    s.open = true; showCard();
+    if (s.answer.ok !== 'no') sayWord();
+  }; }
+  $$('[data-r]').forEach(b => b.onclick = async () => {
+    const r = RATING()[+b.dataset.r], wasNew = !v.fsrs.reps;
+    const nc = fsrsInst.repeat(cardOf(v), new Date())[r].card;
+    v.fsrs = nc; v.due = new Date(nc.due).getTime(); v.reps = nc.reps;
+    if (wasNew) lsSet(newTodayKey(), String((+lsGet(newTodayKey()) || 0) + 1));
+    if ((nc.stability || 0) >= 21) { known.add(cleanTok(v.word)); saveKnown(); }
     await saveVocab();
-    s.idx++; s.open = false; showCard();
+    // a lapse comes back within this session
+    if (r === fsrsLib.Rating.Again) { s.queue.push(v); s.total++; }
+    s.idx++; s.open = false; s.task = null; s.answer = null; s.played = false; showCard(); counters();
   });
 }
 
@@ -1786,11 +1931,15 @@ function settingsSheet() {
     <div class="sh-sub">Учёба</div>
     <div class="opts">
       <button class="opt" data-a="goal">Цель на день: ${goalMin()} мин <span>›</span></button>
+      <button class="opt" data-a="newd">Новых карточек в день: ${newPerDay()} <span>›</span></button>
       <button class="opt" data-a="lvl">Подчёркивание: ${({ less: 'меньше', more: 'больше', off: 'выключено' })[level]} <span>›</span></button>
       <button class="opt" data-a="ai">ИИ для разбора слов: ${aiLabel()} <span>›</span></button>
     </div>`, el => {
     el.querySelectorAll('[data-th]').forEach(b => b.onclick = () => { setTheme(b.dataset.th); el.querySelectorAll('[data-th]').forEach(x => x.setAttribute('aria-pressed', x === b)); });
     el.querySelector('[data-a=goal]').onclick = goalSheet;
+    el.querySelector('[data-a=newd]').onclick = () => openSheet(`<h3>Новых карточек в день</h3><p>Сколько новых слов попадает в повторение за день. Остальные подождут до завтра, а уже начатые повторяются всегда.</p><div class="speed-grid">${[5, 10, 20, 30, 50].map(n => `<button data-n="${n}" class="num ${n === newPerDay() ? 'sel' : ''}">${n}</button>`).join('')}</div>`, e2 => {
+      e2.querySelectorAll('[data-n]').forEach(b => b.onclick = () => { lsSet('et-newday', b.dataset.n); session = null; closeSheet(); render(); });
+    });
     el.querySelector('[data-a=lvl]').onclick = levelSheet;
     el.querySelector('[data-a=ai]').onclick = () => keySheet();
   });
@@ -2001,7 +2150,7 @@ const markActive = () => { lastAct = Date.now(); };
 ['scroll', 'touchstart', 'click'].forEach(ev => document.addEventListener(ev, markActive, { passive: true, capture: true }));
 setInterval(() => {
   const now = Date.now();
-  const reading = cur?.mode === 'read' && $('#reader')?.classList.contains('open') && document.visibilityState === 'visible' && audio.paused && now - lastAct < 90000;
+  const reading = (cur?.mode === 'read' && $('#reader')?.classList.contains('open') || curTab === 'cards' && !$('#reader')?.classList.contains('open')) && document.visibilityState === 'visible' && audio.paused && now - lastAct < 90000;
   if (reading && readTick) addPractice(Math.min(now - readTick, 10000) / 1000);
   readTick = now;
 }, 5000);

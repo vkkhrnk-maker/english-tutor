@@ -295,6 +295,9 @@ input[type=range]:active::-webkit-slider-thumb{transform:scale(1.25)}
 .lib-head img{width:88px;height:88px;border-radius:var(--r-s);flex:none;object-fit:cover}
 .lib-head h3{margin:2px 0 6px}
 .demo-note{font-size:12px!important;color:var(--fg-3)!important;margin-top:4px!important}
+.tx.blind .para:not(.shown):not(.ch) .w{filter:blur(6px);color:var(--fg-3);cursor:default;transition:filter .3s}
+.tx.blind .para:not(.shown):not(.ch) .w.active{background:none;filter:blur(6px)}
+.rec-dot::before{content:"";display:inline-block;width:10px;height:10px;border-radius:50%;background:var(--danger);margin-right:8px;vertical-align:1px;animation:pulse 1s infinite}
 .tr-offer{display:grid;gap:10px;justify-items:center}
 .tr-offer b{font-size:17px;color:var(--fg)}
 .tr-offer .acts{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin-top:6px}
@@ -401,6 +404,7 @@ button.pill{cursor:pointer}
 .rd-ctrls .ibtn.big{width:64px;height:64px}
 .rd-chips{display:flex;gap:6px;justify-content:center;flex-wrap:wrap}
 .rd-chips .chip{height:32px;padding:0 12px;font-size:12px}
+#r-blind-t,#r-shadow-t{white-space:nowrap;padding:0 12px}
 .shadowbar{display:flex;align-items:center;gap:8px;justify-content:center;background:var(--accent-soft);border-radius:var(--r-m);padding:8px 10px;font-size:13px;font-weight:600;color:var(--accent);flex-wrap:wrap}
 .shadowbar .btn{height:34px;padding:0 14px;font-size:13px}
 
@@ -998,12 +1002,18 @@ audio.addEventListener('timeupdate', () => {
   if (Date.now() - lastSave > 4000) { lastSave = Date.now(); save(); }
   syncWords(t); updateSeek();
   if (stopAt != null && t >= stopAt) { audio.pause(); stopAt = null; }
+  if (blind && !audio.paused && tr?.paraOf && activeSeg >= 0 && stopAt == null) {
+    const k = tr.paraOf[activeSeg], last = tr.segs[tr.paraSegs[k]?.[1]];
+    if (last && t >= last.e - 0.05 && blindPaused !== k) { blindPaused = k; audio.pause(); showBlindBar(k, 1); }
+  }
   if (shadow && !audio.paused && tr && activeSeg >= 0 && stopAt == null) {
     const sg = tr.segs[activeSeg];
-    if (sg && t >= sg.e - 0.05 && shadowPaused !== activeSeg) { shadowPaused = activeSeg; audio.pause(); showShadowBar(true); }
+    if (sg && t >= sg.e - 0.05 && shadowPaused !== activeSeg) { shadowPaused = activeSeg; audio.pause(); showShadowBar(true, 'idle'); }
   }
 });
-audio.addEventListener('play', () => { showShadowBar(false); playIcon(); renderMini(); setPS('playing'); });
+audio.addEventListener('play', () => { if (!shadowCmp) showShadowBar(false); if (!blindReplay) showBlindBar(-1); playIcon(); renderMini(); setPS('playing'); });
+audio.addEventListener('seeked', () => { if (!blind) return; if (!blindReplay) blindPaused = -1; applyBlind(); });
+audio.addEventListener('pause', () => { if (blindReplay && blindPaused >= 0) { blindReplay = false; showBlindBar(blindPaused, 2); } });
 audio.addEventListener('pause', () => { save(); playIcon(); renderMini(); setPS('paused'); });
 audio.addEventListener('ended', () => { if (cur && cur.pos.part < cur.parts.length - 1) loadPart(cur.pos.part + 1, 0, true); });
 addEventListener('visibilitychange', () => { if (document.hidden) save(); });
@@ -1083,7 +1093,8 @@ function openReader() {
     <div class="tx" id="tx"><div class="tx-in" id="tx-in"></div></div>
     <div class="follow-wrap"><button class="btn ghost" id="r-follow" hidden>К текущему месту</button><button class="btn primary sel-fab" id="sel-fab" hidden>Разобрать фразу</button></div>
     <div class="rd-bottom"><div class="wrap readbar" id="r-readbar" hidden><button class="btn primary" id="r-listen-here">Слушать с этого места</button></div><div class="wrap" id="r-player">
-      <div class="shadowbar" id="r-shadow" hidden>Повторите фразу вслух <button class="btn ghost" id="sh-again">Ещё раз</button><button class="btn primary" id="sh-next">Дальше</button></div>
+      <div class="shadowbar" id="r-shadow" hidden></div>
+      <div class="shadowbar" id="r-blind" hidden></div>
       <div><input type="range" id="r-seek" min="0" max="1000" value="0" aria-label="Позиция"><div class="times num"><span id="r-el">0:00</span><span id="r-rem">-0:00</span></div></div>
       <div class="rd-ctrls">
         <button class="ibtn" id="r-prev" aria-label="Предыдущая фраза">${I.prev}</button>
@@ -1092,6 +1103,7 @@ function openReader() {
         <button class="ibtn" id="r-next" aria-label="Следующая фраза">${I.next}</button>
         <button class="chip" id="r-speed"></button>
         <button class="chip on" id="r-shadow-t" hidden aria-label="Тень включена. Выключить">Тень</button>
+        <button class="chip on" id="r-blind-t" hidden aria-label="Режим без текста включён. Выключить">Без текста</button>
       </div>
     </div></div>`;
   R.classList.add('open'); document.body.style.overflow = 'hidden';
@@ -1103,8 +1115,8 @@ function openReader() {
   $('#r-again').onclick = replaySentence;
   $('#r-speed').onclick = speedSheet;
   $('#r-shadow-t').onclick = () => toggleShadow();
-  $('#sh-again').onclick = () => { shadowPaused = -1; replaySentence(); };
-  $('#sh-next').onclick = () => { showShadowBar(false); audio.play().catch(() => {}); };
+  $('#r-blind-t').onclick = () => toggleBlind();
+
   $('#r-nav').onclick = navSheet;
   $('#trs-stop').onclick = () => { if (trJob) { trJob.stop = true; toast('Остановлю после текущего куска'); } };
   $$('.mode-seg [data-mode]').forEach(b => b.onclick = () => setMode(b.dataset.mode));
@@ -1125,6 +1137,7 @@ function openReader() {
   $('#sel-fab').onclick = () => { if (!selRange) return; const [i0, i1] = selRange; try { getSelection().removeAllRanges(); } catch {} selRange = null; $('#sel-fab').hidden = true; lookupPhrase(i0, i1); };
   tx.addEventListener('click', e => {
     const span = e.target.closest('.w'); if (!span) return;
+    if (blind && !span.closest('.para')?.classList.contains('shown')) return;
     if (selRange) return;   // finishing a selection is not a tap on a word
     const i = +span.dataset.i;
     if (dbl !== null) { clearTimeout(dbl); dbl = null; closeSheet(); seekToWord(i); return; }
@@ -1174,13 +1187,16 @@ function renderReader() {
     // starting a new one only after a sentence ends and the reader pauses (or the paragraph is long)
     const frag = document.createDocumentFragment();
     let para = null, paraLen = 0;
+    tr.paraOf = []; tr.paraSegs = [];
     tr.segs.forEach((sg, si) => {
       const prev = tr.segs[si - 1];
       const prevEnds = !prev || sentenceEnds(tr.words[prev.wi1 - 1]?.w || '');
       const gap = prev ? sg.s - prev.e : 0;
       if (sg.ch || prev?.ch || !para || (prevEnds && (gap > 1.1 || paraLen > 650))) {
-        para = document.createElement('p'); para.className = 'para' + (sg.ch ? ' ch' : ''); frag.appendChild(para); paraLen = 0;
+        para = document.createElement('p'); para.className = 'para' + (sg.ch ? ' ch' : ''); para.dataset.p = tr.paraSegs.length; frag.appendChild(para); paraLen = 0;
+        tr.paraSegs.push([si, si]);
       }
+      tr.paraOf[si] = tr.paraSegs.length - 1; tr.paraSegs[tr.paraSegs.length - 1][1] = si;
       const el = document.createElement('span'); el.className = 'sg'; el.dataset.seg = si;
       for (let i = sg.wi0; i < sg.wi1; i++) {
         const w = tr.words[i], span = document.createElement('span');
@@ -1192,7 +1208,7 @@ function renderReader() {
     box.innerHTML = ''; box.appendChild(frag);
     paint();
   }
-  renderChips(); playIcon(); updateSeek(); renderTrStatus();
+  renderChips(); playIcon(); updateSeek(); renderTrStatus(); applyBlind();
   if (tr && cur.parts[cur.pos.part]?.trPartial && !trJob) box.insertAdjacentHTML('beforeend', `<div class="tr-more"><span>Дальше текст ещё не расшифрован</span><button class="btn primary" id="tr-cont">Продолжить расшифровку</button></div>`), box.querySelector('#tr-cont').onclick = () => startTranscription(cur, [cur.pos.part]);
   activeW = -1; activeSeg = -1; follow = true; $('#r-follow').hidden = true;
   syncWords(audio.src ? audio.currentTime : cur.pos.t);
@@ -1216,7 +1232,9 @@ function paint() {
 }
 let partStats = null;
 function toggleShadow() {
-  shadow = !shadow; lsSet('et-shadow', shadow ? '1' : '0'); shadowPaused = -1; showShadowBar(false); renderChips();
+  shadow = !shadow; lsSet('et-shadow', shadow ? '1' : '0'); shadowPaused = -1; showShadowBar(false);
+  if (shadow && blind) { blind = false; lsSet('et-blind', '0'); showBlindBar(-1); applyBlind(); }
+  renderChips();
   toast(shadow ? 'Тень включена: пауза после каждой фразы, чтобы повторить вслух' : 'Тень выключена');
 }
 function levelSheet() {
@@ -1254,11 +1272,85 @@ function sentenceStep(d) {
   if (audio.paused) audio.play().catch(() => {});
 }
 function replaySentence() { if (!tr || activeSeg < 0) return; const sg = tr.segs[activeSeg]; shadowPaused = -1; showShadowBar(false); audio.currentTime = sg.s + 0.01; audio.play().catch(() => {}); }
-function showShadowBar(on) { const b = $('#r-shadow'); if (b) b.hidden = !on; }
+// shadowing: repeat the phrase aloud, optionally record yourself and compare with the narrator
+let shadowCmp = false, recState = null, recUrl = null;
+const recAudio = new Audio();
+function showShadowBar(on, stage = 'idle') {
+  const b = $('#r-shadow'); if (!b) return;
+  b.hidden = !on; if (!on) { shadowCmp = false; return; }
+  const sg = tr?.segs[activeSeg];
+  if (stage === 'idle') b.innerHTML = `<span>Повторите фразу вслух</span><button class="btn ghost" data-sh="again">Ещё раз</button><button class="btn ghost" data-sh="rec">🎙 Записать себя</button><button class="btn primary" data-sh="next">Дальше</button>`;
+  if (stage === 'rec') b.innerHTML = `<span class="rec-dot">Говорите…</span><button class="btn primary" data-sh="stop">Стоп</button>`;
+  if (stage === 'cmp') b.innerHTML = `<span>Сравните</span><button class="btn ghost" data-sh="orig">▶ Чтец</button><button class="btn ghost" data-sh="mine">▶ Вы</button><button class="btn ghost" data-sh="rec">Записать снова</button><button class="btn primary" data-sh="next">Дальше</button>`;
+  shadowCmp = stage !== 'idle';
+  b.querySelectorAll('[data-sh]').forEach(x => x.onclick = () => shadowAction(x.dataset.sh, sg));
+}
+async function shadowAction(a, sg) {
+  if (a === 'again') { shadowPaused = -1; showShadowBar(false); replaySentence(); }
+  if (a === 'next') { recAudio.pause(); showShadowBar(false); audio.play().catch(() => {}); }
+  if (a === 'orig' && sg) { recAudio.pause(); playRange(sg.s, sg.e); }
+  if (a === 'mine' && recUrl) { audio.pause(); recAudio.src = recUrl; recAudio.play().catch(() => {}); }
+  if (a === 'stop') recState?.rec.state === 'recording' && recState.rec.stop();
+  if (a === 'rec') {
+    if (!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder) { toast('Запись голоса недоступна в этом браузере'); return; }
+    let stream;
+    try { stream = await navigator.mediaDevices.getUserMedia({ audio: true }); } catch { toast('Нет доступа к микрофону. Разрешите его в настройках'); return; }
+    const rec = new MediaRecorder(stream), chunks = [];
+    rec.ondataavailable = e => e.data.size && chunks.push(e.data);
+    rec.onstop = () => {
+      stream.getTracks().forEach(t => t.stop()); clearTimeout(recState?.timer); recState = null;
+      if (recUrl) URL.revokeObjectURL(recUrl);
+      recUrl = URL.createObjectURL(new Blob(chunks, { type: rec.mimeType || 'audio/mp4' }));
+      showShadowBar(true, 'cmp');
+      recAudio.src = recUrl; recAudio.play().catch(() => {});
+    };
+    rec.start();
+    const limit = Math.max(2.5, ((sg?.e || 0) - (sg?.s || 0)) * 1.8 + 1);
+    recState = { rec, timer: setTimeout(() => rec.state === 'recording' && rec.stop(), limit * 1000) };
+    showShadowBar(true, 'rec');
+  }
+}
+// blind listening: text stays hidden until you say how much you understood
+let blind = lsGet('et-blind') === '1', blindPaused = -1, blindReplay = false;
+const shownParas = new Set();
+function applyBlind() {
+  const tx = $('#tx'); if (!tx) return;
+  tx.classList.toggle('blind', blind);
+  if (!blind || !tr?.paraOf) return;
+  const here = activeSeg >= 0 ? tr.paraOf[activeSeg] : 0;
+  tx.querySelectorAll('.para').forEach(el => el.classList.toggle('shown', +el.dataset.p < here || shownParas.has(+el.dataset.p)));
+}
+function toggleBlind() {
+  blind = !blind; lsSet('et-blind', blind ? '1' : '0'); blindPaused = -1; shownParas.clear();
+  if (blind && shadow) { shadow = false; lsSet('et-shadow', '0'); showShadowBar(false); }
+  showBlindBar(-1); renderChips(); applyBlind();
+  toast(blind ? 'Без текста: слушайте кусок, потом проверьте себя по тексту' : 'Текст снова виден');
+}
+const blindStats = () => { try { return JSON.parse(lsGet('et-blind-' + dayKey()) || '{"all":0,"some":0,"little":0}'); } catch { return { all: 0, some: 0, little: 0 }; } };
+function showBlindBar(k, stage) {
+  const b = $('#r-blind'); if (!b) return;
+  if (k < 0) { b.hidden = true; return; }
+  b.hidden = false;
+  if (stage === 1) {
+    applyBlind();
+    b.innerHTML = `<span>Сколько вы поняли?</span><button class="btn ghost" data-b="little">Мало</button><button class="btn ghost" data-b="some">Частично</button><button class="btn primary" data-b="all">Почти всё</button>`;
+    b.querySelectorAll('[data-b]').forEach(x => x.onclick = () => {
+      const st = blindStats(); st[x.dataset.b]++; lsSet('et-blind-' + dayKey(), JSON.stringify(st));
+      shownParas.add(k); document.querySelector(`.para[data-p="${k}"]`)?.classList.add('shown');
+      showBlindBar(k, 2);
+    });
+  } else {
+    const st = blindStats(), n = st.all + st.some + st.little;
+    b.innerHTML = `<span>Сверьтесь с текстом${n ? ` · сегодня понятно ${st.all} из ${n}` : ''}</span><button class="btn ghost" data-b="again">Ещё раз с текстом</button><button class="btn primary" data-b="next">Дальше</button>`;
+    b.querySelector('[data-b=again]').onclick = () => { const [a, z] = tr.paraSegs[k]; blindReplay = true; playRange(tr.segs[a].s, tr.segs[z].e); };
+    b.querySelector('[data-b=next]').onclick = () => { b.hidden = true; const z = tr.paraSegs[k][1], nx = tr.segs[z + 1]; if (nx) audio.currentTime = nx.s + 0.01; audio.play().catch(() => {}); };
+  }
+}
 function playIcon() { const b = $('#r-play'); if (b) { b.innerHTML = (audio.paused ? I.play : I.pause).replace('width="24" height="24"', 'width="30" height="30"'); b.setAttribute('aria-label', audio.paused ? 'Слушать' : 'Пауза'); } }
 function renderChips() {
   const s = $('#r-speed'); if (s) s.textContent = String(cur?.speed || 1).replace('.', ',') + '×';
   const sh = $('#r-shadow-t'); if (sh) sh.hidden = !shadow;
+  const bl = $('#r-blind-t'); if (bl) bl.hidden = !blind;
 }
 function updateSeek() {
   const s = $('#r-seek'); if (!s || seeking) return;
@@ -1303,7 +1395,8 @@ function moreSheet() {
     ${partStats ? `<div class="stat"><div><b class="num">≈${partStats.pct}%</b><span>слов этой части вы, скорее всего, знаете</span></div><div><b class="num">${partStats.rare}</b><span>${plural(partStats.rare, 'редкое слово', 'редких слова', 'редких слов')} в ней</span></div></div>` : ''}
     <div class="sh-sub">Тренировка</div>
     <div class="opts">
-      <button class="toggle" role="switch" aria-checked="${shadow}" id="m-shadow"><span>Тень<small>пауза после каждой фразы, чтобы повторить вслух</small></span><i></i></button>
+      <button class="toggle" role="switch" aria-checked="${shadow}" id="m-shadow"><span>Тень<small>пауза после каждой фразы: повторите вслух или запишите себя и сравните с чтецом</small></span><i></i></button>
+      <button class="toggle" role="switch" aria-checked="${blind}" id="m-blind"><span>На слух без текста<small>текст скрыт, после каждого куска проверяете себя</small></span><i></i></button>
       <button class="opt" data-a="dict"><span>Диктант<small>слушаете фразу и записываете её</small></span><span>›</span></button>
     </div>
     <div class="sh-sub">Текст</div>
@@ -1319,7 +1412,8 @@ function moreSheet() {
       <button class="opt dz" data-a="del">Удалить книгу с телефона</button>
     </div>`, el => {
     el.querySelector('[data-a=lvl]').onclick = levelSheet;
-    el.querySelector('#m-shadow').onclick = e => { toggleShadow(); e.currentTarget.setAttribute('aria-checked', shadow); };
+    el.querySelector('#m-shadow').onclick = e => { toggleShadow(); e.currentTarget.setAttribute('aria-checked', shadow); el.querySelector('#m-blind').setAttribute('aria-checked', blind); };
+    el.querySelector('#m-blind').onclick = e => { toggleBlind(); e.currentTarget.setAttribute('aria-checked', blind); el.querySelector('#m-shadow').setAttribute('aria-checked', shadow); };
     el.querySelector('[data-a=dict]').onclick = dictationSheet;
     el.querySelector('[data-a=ai]').onclick = () => keySheet();
     el.querySelector('[data-a=tr]').onclick = () => { closeSheet(); pendingAttach = b; $('#f-files').click(); };

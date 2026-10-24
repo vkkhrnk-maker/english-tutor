@@ -1,5 +1,5 @@
 // Офлайн-кэш оболочки приложения. Сами книги лежат в IndexedDB и через этот файл не проходят.
-const VERSION = '24070a0ae9';
+const VERSION = 'ea09033458';
 const CACHE = `entutor-${VERSION}`;
 const SHELL = ['./', 'index.html', 'manifest.webmanifest', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/apple-touch-icon.png', 'en-frequency.txt', 'vendor/ts-fsrs.mjs'];
 
@@ -15,6 +15,14 @@ self.addEventListener('activate', e => {
   );
 });
 
+// cross-origin isolation: GitHub Pages can't send these headers, so the worker adds them;
+// it unlocks SharedArrayBuffer, which lets speech recognition use every CPU core
+function isolate(res) {
+  const h = new Headers(res.headers);
+  h.set('Cross-Origin-Opener-Policy', 'same-origin');
+  h.set('Cross-Origin-Embedder-Policy', 'require-corp');
+  return new Response(res.body, { status: res.status, statusText: res.statusText, headers: h });
+}
 self.addEventListener('fetch', e => {
   const req = e.request;
   if (req.method !== 'GET') return;
@@ -24,8 +32,8 @@ self.addEventListener('fetch', e => {
   if (req.mode === 'navigate') {
     e.respondWith(
       fetch(req, { cache: 'no-cache' })   // мимо HTTP-кэша: GitHub Pages разрешает держать страницу 10 минут
-        .then(res => { const copy = res.clone(); caches.open(CACHE).then(c => c.put('index.html', copy)); return res; })
-        .catch(() => caches.match('index.html'))
+        .then(res => { const copy = res.clone(); caches.open(CACHE).then(c => c.put('index.html', copy)); return isolate(res); })
+        .catch(() => caches.match('index.html').then(r => r && isolate(r)))
     );
     return;
   }

@@ -20,7 +20,7 @@ body{margin:0}img{max-width:100%}[hidden]{display:none!important}
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600;700&family=Literata:opsz,wght@7..72,400;7..72,500&display=swap">
+<link rel="stylesheet" crossorigin="anonymous" href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600;700&family=Literata:opsz,wght@7..72,400;7..72,500&display=swap">
 <style>
 
 /* Layout: library grid of covers → full-screen player sheet; mini-player docked at the bottom. Plasma-like: pill controls, 20px radii, teal accent. */
@@ -1030,6 +1030,12 @@ audio.addEventListener('timeupdate', () => {
     if (sg && t >= sg.e - 0.05 && shadowPaused !== activeSeg) { shadowPaused = activeSeg; audio.pause(); showShadowBar(true, 'idle'); }
   }
 });
+audio.addEventListener('play', () => { autoTranscribe(); });
+function autoTranscribe() {
+  if (!cur || trJob || lsGet('et-asr-auto') === '0' || lsGet('et-asr-ready') !== '1') return;
+  const p = cur.parts[cur.pos.part];
+  if (p && (!p.tr || p.trPartial)) { startTranscription(cur, [cur.pos.part], true); toast('Расшифровываю на опережение: текст появится там, где вы слушаете', 3500); }
+}
 audio.addEventListener('play', () => { if (!shadowCmp) showShadowBar(false); if (!blindReplay) showBlindBar(-1); playIcon(); renderMini(); setPS('playing'); });
 audio.addEventListener('seeked', () => { if (!blind) return; if (!blindReplay) blindPaused = -1; applyBlind(); });
 audio.addEventListener('pause', () => { if (blindReplay && blindPaused >= 0) { blindReplay = false; showBlindBar(blindPaused, 2); } });
@@ -1111,7 +1117,7 @@ function openReader() {
     <div class="tr-status" id="tr-status" hidden><span class="trs-t"></span><button class="lnk" id="trs-stop">Пауза</button><div class="pbar"><i></i></div></div>
     <div class="tx" id="tx"><div class="tx-in" id="tx-in"></div></div>
     <div class="follow-wrap"><button class="btn ghost" id="r-follow" hidden>К текущему месту</button><button class="btn primary sel-fab" id="sel-fab" hidden>Разобрать фразу</button></div>
-    <div class="rd-bottom"><div class="wrap readbar" id="r-readbar" hidden><button class="btn primary" id="r-listen-here">Слушать с этого места</button></div><div class="wrap" id="r-player">
+    <div class="rd-bottom" id="r-bottom"><div class="wrap" id="r-player">
       <div class="shadowbar" id="r-shadow" hidden></div>
       <div class="shadowbar" id="r-blind" hidden></div>
       <div><input type="range" id="r-seek" min="0" max="1000" value="0" aria-label="Позиция"><div class="times num"><span id="r-el">0:00</span><span id="r-rem">-0:00</span></div></div>
@@ -1138,8 +1144,10 @@ function openReader() {
 
   $('#r-nav').onclick = navSheet;
   $('#trs-stop').onclick = () => { if (trJob) { trJob.stop = true; toast('Остановлю после текущего куска'); } };
-  $$('.mode-seg [data-mode]').forEach(b => b.onclick = () => setMode(b.dataset.mode));
-  $('#r-listen-here').onclick = () => { const si = firstVisibleSeg(); setMode('listen'); if (tr && si >= 0) { audio.currentTime = tr.segs[si].s + 0.01; } follow = true; audio.play().catch(() => {}); };
+  $$('.mode-seg [data-mode]').forEach(b => b.onclick = () => {
+    if (b.dataset.mode === 'listen' && cur?.mode === 'read' && tr) { const si = firstVisibleSeg(); setMode('listen'); if (si >= 0 && audio.src) audio.currentTime = tr.segs[si].s + 0.01; return; }
+    setMode(b.dataset.mode);
+  });
   let readT;
   $('#tx').addEventListener('scroll', () => {
     if (cur?.mode !== 'read' || !tr) return;
@@ -1181,8 +1189,7 @@ function setMode(m) {
   const read = cur.mode === 'read';
   if (read) { audio.pause(); showShadowBar(false); stopAt = null; }
   $('#tx')?.classList.toggle('reading', read);
-  const pl = $('#r-player'), rb = $('#r-readbar');
-  if (pl) pl.hidden = read; if (rb) rb.hidden = !read;
+  const bt = $('#r-bottom'); if (bt) bt.hidden = read;
   $$('.mode-seg [data-mode]').forEach(b => b.setAttribute('aria-pressed', b.dataset.mode === cur.mode));
   if (!read) { follow = true; $('#r-follow').hidden = true; activeW = -1; activeSeg = -1; syncWords(audio.currentTime || cur.pos.t); scrollToActive(true); }
   else $('#r-follow').hidden = true;
@@ -2028,7 +2035,9 @@ function settingsSheet() {
       <button class="opt" data-a="newd">Новых карточек в день: ${newPerDay()} <span>›</span></button>
       <button class="opt" data-a="lvl">Подчёркивание: ${({ less: 'меньше', more: 'больше', off: 'выключено' })[level]} <span>›</span></button>
       <button class="opt" data-a="ai">ИИ для разбора слов: ${aiLabel()} <span>›</span></button>
+      <button class="toggle" role="switch" aria-checked="${lsGet('et-asr-auto') !== '0'}" id="s-auto"><span>Расшифровывать на ходу<small>книги без текста расшифровываются впереди того места, где вы слушаете</small></span><i></i></button>
     </div>`, el => {
+    el.querySelector('#s-auto').onclick = e => { const on = lsGet('et-asr-auto') === '0'; lsSet('et-asr-auto', on ? '1' : '0'); e.currentTarget.setAttribute('aria-checked', on); };
     el.querySelectorAll('[data-th]').forEach(b => b.onclick = () => { setTheme(b.dataset.th); el.querySelectorAll('[data-th]').forEach(x => x.setAttribute('aria-pressed', x === b)); });
     el.querySelector('[data-a=goal]').onclick = goalSheet;
     el.querySelector('[data-a=newd]').onclick = () => openSheet(`<h3>Новых карточек в день</h3><p>Сколько новых слов попадает в повторение за день. Остальные подождут до завтра, а уже начатые повторяются всегда.</p><div class="speed-grid">${[5, 10, 20, 30, 50].map(n => `<button data-n="${n}" class="num ${n === newPerDay() ? 'sel' : ''}">${n}</button>`).join('')}</div>`, e2 => {
@@ -2044,19 +2053,37 @@ const ASR_MODEL = 'onnx-community/whisper-base.en_timestamped';
 const ASR_WORKER = `
 import { pipeline, env } from 'https://cdn.jsdelivr.net/npm/@huggingface/transformers@4.3.0/+esm';
 env.allowLocalModels = false;
-let pipe = null;
+let pipe = null, device = null;
+async function load(model, id, noGpu) {
+  const progress_callback = p => { if (p.status === 'progress' && p.total) self.postMessage({ id, type: 'download', file: p.file, loaded: p.loaded, total: p.total }); };
+  if (!noGpu && self.navigator.gpu) {
+    try {
+      const adapter = await self.navigator.gpu.requestAdapter();
+      if (adapter) {
+        pipe = await pipeline('automatic-speech-recognition', model, { device: 'webgpu', dtype: { encoder_model: 'fp32', decoder_model_merged: 'q4' }, progress_callback });
+        device = 'webgpu'; return;
+      }
+    } catch (e) { pipe = null; }
+  }
+  env.backends.onnx.wasm.numThreads = self.crossOriginIsolated ? Math.max(1, Math.min(4, (self.navigator.hardwareConcurrency || 2) - 1)) : 1;
+  pipe = await pipeline('automatic-speech-recognition', model, { dtype: 'q8', device: 'wasm', progress_callback });
+  device = 'wasm-' + env.backends.onnx.wasm.numThreads;
+}
 self.onmessage = async (e) => {
   const { id, model, audio } = e.data;
   try {
-    if (!pipe) pipe = await pipeline('automatic-speech-recognition', model, {
-      dtype: 'q8', device: 'wasm',
-      progress_callback: p => { if (p.status === 'progress' && p.total) self.postMessage({ id, type: 'download', file: p.file, loaded: p.loaded, total: p.total }); },
-    });
-    const out = await pipe(audio, { return_timestamps: 'word' });
-    self.postMessage({ id, type: 'done', chunks: (out && out.chunks) || [] });
+    if (!pipe) await load(model, id, false);
+    let out;
+    try { out = await pipe(audio, { return_timestamps: 'word' }); }
+    catch (err) {
+      if (device !== 'webgpu') throw err;
+      pipe = null; await load(model, id, true);              // the GPU path failed: fall back to the CPU
+      out = await pipe(audio, { return_timestamps: 'word' });
+    }
+    self.postMessage({ id, type: 'done', chunks: (out && out.chunks) || [], device });
   } catch (err) { self.postMessage({ id, type: 'error', message: String(err && err.message || err) }); }
 };`;
-let asrWorker = null, asrSeq = 0;
+let asrWorker = null, asrSeq = 0, asrDevice = '';
 const asrJobs = new Map();
 function asrRun(audio, onDownload) {
   if (!asrWorker) {
@@ -2068,7 +2095,7 @@ function asrRun(audio, onDownload) {
   return new Promise((res, rej) => {
     asrJobs.set(id, m => {
       if (m.type === 'download') onDownload?.(m);
-      else { asrJobs.delete(id); m.type === 'done' ? res(m.chunks) : rej(new Error(m.message)); }
+      else { asrJobs.delete(id); if (m.device) asrDevice = m.device; m.type === 'done' ? res(m.chunks) : rej(new Error(m.message)); }
     });
     asrWorker.postMessage({ id, model: ASR_MODEL, audio }, [audio.buffer]);
   });
@@ -2123,52 +2150,71 @@ function wordsToCompact(words, d, partial, upTo) {
   return { d, s: segs, partial: !!partial, upTo };
 }
 let trJob = null;   // { bookId, part, done, total, speed, stop, queue: [part indexes], dl }
+const STEP = 28, WIN = 30;
 async function transcribePart(b, i) {
   const p = b.parts[i];
   const blob = await getFile(p.key);
   if (!blob) throw new Error('nofile');
   if (!(/mpeg|mp3/i.test(blob.type) || /\.mp3$/i.test(p.name))) { const h = new Uint8Array(await blob.slice(0, 3).arrayBuffer()); if (!(h[0] === 0x49 && h[1] === 0x44) && !(h[0] === 0xFF)) throw new Error('notmp3'); }
   const dur = p.duration || await mp3Duration(blob);
+  const N = Math.max(1, Math.ceil((dur - 0.5) / STEP));
   const old = p.tr ? await getFile(p.tr) : null;
-  const words = old?.partial ? old.s.flatMap(sg => sg[2]) : [];
-  let t = old?.partial ? old.upTo : 0;
-  const STEP = 28, WIN = 30;
-  trJob.total = dur; trJob.done = t;
+  let words = old?.partial ? old.s.flatMap(sg => sg[2]) : [];
+  const done = new Set(old?.partial ? (old.done || Array.from({ length: Math.round((old.upTo || 0) / STEP) }, (_, k) => k)) : []);
+  trJob.total = dur;
   const Ctx = window.AudioContext || window.webkitAudioContext;
   const ctx = new Ctx();
+  // the chunk to do next: right where you're listening, otherwise the first gap
+  const nextChunk = () => {
+    if (cur?.id === b.id && cur.pos.part === i && audio.src) {
+      const from = Math.floor(Math.max(0, audio.currentTime - 3) / STEP);
+      for (let k = from; k < N; k++) if (!done.has(k)) return k;
+    }
+    for (let k = 0; k < N; k++) if (!done.has(k)) return k;
+    return -1;
+  };
   try {
-    while (t < dur - 0.5) {
-      if (trJob.stop) break;
-      const t0 = performance.now();
-      const part = await mp3Slice(blob, t, Math.min(dur, t + WIN), dur);
+    for (let k = nextChunk(); k >= 0 && !trJob.stop; k = nextChunk()) {
+      const t0 = performance.now(), t = k * STEP, last = k === N - 1;
+      trJob.done = done.size * STEP;
+      const slice = await mp3Slice(blob, t, Math.min(dur, t + WIN), dur);
       let pcm;
-      try { pcm = toMono16k(await ctx.decodeAudioData(await part.arrayBuffer())); } catch { t += STEP; continue; }
+      try { pcm = toMono16k(await ctx.decodeAudioData(await slice.arrayBuffer())); } catch { done.add(k); continue; }
       const chunks = await asrRun(pcm, m => { trJob.dl = trJob.dl || {}; trJob.dl[m.file] = [m.loaded, m.total]; renderTrStatus(); });
-      trJob.dl = null;
-      const last = t + STEP >= dur - 0.5;
+      trJob.dl = null; lsSet('et-asr-ready', '1');
       for (const c of chunks) {
         const [a, z] = c.timestamp || [];
         if (a == null) continue;
-        if (t > 0 && a < 1) continue;                    // already taken from the previous window
-        if (!last && a >= STEP + 1) continue;            // the next window covers it
+        if (k > 0 && a < 1) continue;                    // the previous window owns it
+        if (!last && a >= STEP + 1) continue;            // the next window owns it
         const txt = String(c.text || '').trim(); if (!txt) continue;
         words.push([txt, +(t + a).toFixed(2), +(t + (z ?? a + 0.3)).toFixed(2)]);
       }
-      t = Math.min(dur, t + STEP);
-      const audioSec = Math.min(STEP, dur), took = (performance.now() - t0) / 1000;
-      trJob.speed = trJob.speed ? trJob.speed * 0.7 + (audioSec / took) * 0.3 : audioSec / took;
-      trJob.done = t;
-      const c = wordsToCompact(words, dur, t < dur - 0.5, t);
+      done.add(k);
+      const took = (performance.now() - t0) / 1000;
+      trJob.speed = trJob.speed ? trJob.speed * 0.7 + (STEP / took) * 0.3 : STEP / took;
+      trJob.done = Math.min(dur, done.size * STEP);
+      trJob.ahead = aheadOf(done, N);
+      words.sort((x, y) => x[1] - y[1]);
+      const c = wordsToCompact(words, dur, done.size < N, 0);
+      if (c.partial) c.done = [...done];
       await putFile(p.key + ':tr', c);
-      if (!p.tr) { p.tr = p.key + ':tr'; }
+      if (!p.tr) p.tr = p.key + ':tr';
       p.trPartial = c.partial; p.words = words.length; await putBook(b);
       if (cur?.id === b.id && cur.pos.part === i) liveTranscript(c);
       renderTrStatus();
     }
   } finally { try { ctx.close(); } catch {} }
 }
+// how many seconds of text are ready right after the playhead
+function aheadOf(done, N) {
+  if (!audio.src) return 0;
+  let k = Math.floor(audio.currentTime / STEP), n = 0;
+  while (k < N && done.has(k)) { n++; k++; }
+  return n ? Math.max(0, k * STEP - audio.currentTime) : 0;
+}
 let wakeLock = null;
-async function startTranscription(b, parts) {
+async function startTranscription(b, parts, quiet) {
   if (trJob) { toast('Расшифровка уже идёт'); return; }
   trJob = { bookId: b.id, queue: parts.slice(), part: parts[0], done: 0, total: 0, speed: 0, stop: false };
   try { wakeLock = await navigator.wakeLock?.request('screen'); } catch {}
@@ -2186,7 +2232,7 @@ async function startTranscription(b, parts) {
   const stopped = trJob.stop;
   trJob = null;
   try { await wakeLock?.release(); } catch {} wakeLock = null;
-  toast(failed || (stopped ? 'Расшифровка на паузе. Можно продолжить с того же места' : 'Готово: текст расшифрован'), 4000);
+  if (failed || !quiet || !stopped) toast(failed || (stopped ? 'Расшифровка на паузе. Можно продолжить с того же места' : 'Готово: текст расшифрован'), 4000);
   render(); if (cur?.id === b.id) renderReader();
 }
 document.addEventListener('visibilitychange', async () => { if (trJob && document.visibilityState === 'visible' && !wakeLock) { try { wakeLock = await navigator.wakeLock?.request('screen'); } catch {} } });
@@ -2206,7 +2252,10 @@ function trStatusText() {
   const b = books.find(x => x.id === trJob.bookId);
   const left = trJob.speed ? (trJob.total - trJob.done) / trJob.speed : 0;
   const many = trJob.queue.length > 1 ? `часть ${trJob.queue.indexOf(trJob.part) + 1} из ${trJob.queue.length} · ` : '';
-  return `Расшифровываю: ${many}${fmt(trJob.done)} из ${fmt(trJob.total)}${left ? ` · осталось ≈${human(left)}` : ''}`;
+  const pct = trJob.total ? Math.round(trJob.done / trJob.total * 100) : 0;
+  const ahead = !audio.paused && trJob.ahead > 40 ? ` · текст готов на ${human(trJob.ahead)} вперёд` : '';
+  const fast = trJob.speed > 1.2 ? ` · в ${trJob.speed.toFixed(1).replace('.', ',')} раза быстрее звука` : '';
+  return `Расшифровываю: ${many}${pct}%${ahead || (left ? ` · осталось ≈${human(left)}` : '')}${fast}`;
 }
 function renderTrStatus() {
   const el = $('#tr-status'); if (!el) return;
